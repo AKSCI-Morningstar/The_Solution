@@ -1,6 +1,7 @@
 "use client";
 
 import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { cn } from "@/shared/utils";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "destructive";
@@ -9,11 +10,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary:
-    "bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
-  secondary:
-    "border border-black/10 bg-white hover:bg-black/5 dark:border-white/10 dark:bg-black dark:hover:bg-white/5",
-  ghost: "hover:bg-black/5 dark:hover:bg-white/5",
-  destructive: "bg-red-600 text-white hover:bg-red-700 dark:hover:bg-red-600/80",
+    "bg-foreground text-background hover:bg-foreground/80 dark:bg-white dark:text-black dark:hover:bg-white/80",
+  secondary: "border border-border bg-background hover:bg-surface-hover",
+  ghost: "hover:bg-surface-hover",
+  destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/80",
 };
 
 const sizeStyles: Record<NonNullable<ButtonProps["size"]>, string> = {
@@ -27,7 +27,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        className={`inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:ring-2 focus-visible:ring-black/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        className={cn(
+          "focus-visible:ring-ring inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+          variantStyles[variant],
+          sizeStyles[size],
+          className,
+        )}
         {...props}
       />
     );

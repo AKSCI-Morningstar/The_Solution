@@ -10,7 +10,7 @@ describe("Button", () => {
   it("applies primary variant styles by default", () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole("button");
-    expect(button.className).toContain("bg-black");
+    expect(button.className).toContain("bg-foreground");
   });
 
   it("applies secondary variant styles", () => {
