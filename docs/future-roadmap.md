@@ -24,7 +24,7 @@
 - [x] Auth guard for client components
 - [x] Authentication audit events
 - [x] Login, register, forgot/reset password UI
-- [ ] Organization management
+- [x] Organization management (multi-tenancy)
 - [ ] Role-based access control (RBAC)
 - [ ] OAuth / SSO integration
 - [ ] Email verification
