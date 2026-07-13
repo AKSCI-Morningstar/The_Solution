@@ -1,0 +1,28 @@
+{
+  "recommendations": [
+    {
+      "id": "dbaeumer.vscode-eslint",
+      "description": "ESLint integrates into VSCode"
+    },
+    {
+      "id": "esbenp.prettier-vscode",
+      "description": "Code formatter"
+    },
+    {
+      "id": "bradlc.vscode-tailwindcss",
+      "description": "Tailwind CSS IntelliSense"
+    },
+    {
+      "id": "prisma.prisma",
+      "description": "Prisma schema support"
+    },
+    {
+      "id": "ms-playwright.playwright",
+      "description": "Playwright Test for VSCode"
+    },
+    {
+      "id": "csstools.postcss",
+      "description": "PostCSS language support"
+    }
+  ]
+}
