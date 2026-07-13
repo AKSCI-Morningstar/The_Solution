@@ -5,6 +5,7 @@ import {
   createRelationshipSchema,
 } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
@@ -28,6 +29,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const body = await request.json();
     const parsed = createRelationshipSchema.safeParse(body);
     if (!parsed.success) {
@@ -36,7 +44,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const relationship = await createRelationship(orgId, parsed.data, "");
+    const relationship = await createRelationship(orgId, parsed.data, user.id);
     return NextResponse.json({ data: relationship }, { status: 201 });
   } catch (error) {
     if (error instanceof AppError) {

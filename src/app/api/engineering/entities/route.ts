@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listEntities, createEntity, createEntitySchema } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
@@ -24,6 +25,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const body = await request.json();
     const parsed = createEntitySchema.safeParse(body);
     if (!parsed.success) {
@@ -32,7 +40,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const entity = await createEntity(orgId, parsed.data, "");
+    const entity = await createEntity(orgId, parsed.data, user.id);
     return NextResponse.json({ data: entity }, { status: 201 });
   } catch (error) {
     if (error instanceof AppError) {

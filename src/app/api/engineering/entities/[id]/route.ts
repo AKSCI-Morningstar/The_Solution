@@ -8,6 +8,7 @@ import {
   changeEntityStatusSchema,
 } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,6 +31,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const { id } = await params;
     const body = await request.json();
 
@@ -45,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         id,
         orgId,
         parsed.data.status,
-        "",
+        user.id,
         parsed.data.reason,
       );
       return NextResponse.json({ data: entity });
@@ -58,7 +66,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         { status: 400 },
       );
     }
-    const entity = await updateEntity(id, orgId, parsed.data, "");
+    const entity = await updateEntity(id, orgId, parsed.data, user.id);
     return NextResponse.json({ data: entity });
   } catch (error) {
     if (error instanceof AppError) {
@@ -74,8 +82,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const { id } = await params;
-    await deleteEntity(id, orgId, "");
+    await deleteEntity(id, orgId, user.id);
     return NextResponse.json({ data: { message: "Entity deleted" } });
   } catch (error) {
     if (error instanceof AppError) {

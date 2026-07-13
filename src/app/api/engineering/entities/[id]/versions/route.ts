@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listVersions, createVersion } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,9 +24,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const { id } = await params;
     const body = await request.json();
-    const version = await createVersion(id, orgId, body.changeDescription, "");
+    const version = await createVersion(id, orgId, body.changeDescription, user.id);
     return NextResponse.json({ data: version }, { status: 201 });
   } catch (error) {
     if (error instanceof AppError) {
