@@ -1,0 +1,353 @@
+import { prisma } from "@/server/db";
+import { Prisma, type GraphNodeIndex, type GraphEdgeIndex } from "@prisma/client";
+import { NotFoundError } from "@/shared/errors";
+import { logger } from "@/shared/logging";
+
+type NodeRef = Pick<GraphNodeIndex, "id" | "entityId" | "label" | "entityType">;
+type SubgraphEdge = GraphEdgeIndex & { sourceNode: NodeRef; targetNode: NodeRef };
+
+export async function syncGraphIndexes(organizationId: string) {
+  const [entities, relationships] = await Promise.all([
+    prisma.engineeringEntity.findMany({
+      where: { organizationId, deletedAt: null },
+    }),
+    prisma.engineeringRelationship.findMany({
+      where: { organizationId },
+    }),
+  ]);
+
+  for (const entity of entities) {
+    await prisma.graphNodeIndex.upsert({
+      where: { entityId: entity.id },
+      update: {
+        entityType: entity.entityType,
+        identifier: entity.identifier,
+        label: entity.name,
+        status: entity.status,
+        metadata: (entity.metadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+      },
+      create: {
+        organizationId,
+        entityId: entity.id,
+        entityType: entity.entityType,
+        identifier: entity.identifier,
+        label: entity.name,
+        status: entity.status,
+        metadata: (entity.metadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  for (const rel of relationships) {
+    const sourceNode = await prisma.graphNodeIndex.findUnique({
+      where: { entityId: rel.sourceEntityId },
+    });
+    const targetNode = await prisma.graphNodeIndex.findUnique({
+      where: { entityId: rel.targetEntityId },
+    });
+    if (!sourceNode || !targetNode) continue;
+
+    await prisma.graphEdgeIndex.upsert({
+      where: { relationshipId: rel.id },
+      update: {
+        relationshipType: rel.relationshipType,
+        metadata: (rel.metadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+      },
+      create: {
+        organizationId,
+        relationshipId: rel.id,
+        sourceNodeId: sourceNode.id,
+        targetNodeId: targetNode.id,
+        relationshipType: rel.relationshipType,
+        metadata: (rel.metadata ?? Prisma.DbNull) as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  const stats = { nodes: entities.length, edges: relationships.length };
+  logger.info("Graph indexes synced", { organizationId, ...stats });
+  return stats;
+}
+
+export async function getGraphStats(organizationId: string) {
+  const [nodes, edges] = await Promise.all([
+    prisma.graphNodeIndex.count({ where: { organizationId } }),
+    prisma.graphEdgeIndex.count({ where: { organizationId } }),
+  ]);
+  return { nodes, edges };
+}
+
+export async function getGraphNodes(
+  organizationId: string,
+  filters: { entityType?: string; search?: string; page?: number; pageSize?: number },
+) {
+  const { entityType, search, page = 1, pageSize = 50 } = filters;
+  const where: Record<string, unknown> = { organizationId };
+
+  if (entityType) where.entityType = entityType;
+  if (search) {
+    where.OR = [
+      { label: { contains: search, mode: "insensitive" } },
+      { identifier: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.graphNodeIndex.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { label: "asc" },
+    }),
+    prisma.graphNodeIndex.count({ where }),
+  ]);
+
+  return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+}
+
+export async function getGraphEdges(
+  organizationId: string,
+  filters: {
+    relationshipType?: string;
+    sourceNodeId?: string;
+    targetNodeId?: string;
+    page?: number;
+    pageSize?: number;
+  },
+) {
+  const { relationshipType, sourceNodeId, targetNodeId, page = 1, pageSize = 50 } = filters;
+  const where: Record<string, unknown> = { organizationId };
+
+  if (relationshipType) where.relationshipType = relationshipType;
+  if (sourceNodeId) where.sourceNodeId = sourceNodeId;
+  if (targetNodeId) where.targetNodeId = targetNodeId;
+
+  const [data, total] = await Promise.all([
+    prisma.graphEdgeIndex.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: "desc" },
+      include: {
+        sourceNode: {
+          select: { id: true, entityId: true, label: true, entityType: true, identifier: true },
+        },
+        targetNode: {
+          select: { id: true, entityId: true, label: true, entityType: true, identifier: true },
+        },
+      },
+    }),
+    prisma.graphEdgeIndex.count({ where }),
+  ]);
+
+  return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+}
+
+export async function getNodeNeighbors(nodeIndexId: string, organizationId: string) {
+  const node = await prisma.graphNodeIndex.findFirst({
+    where: { id: nodeIndexId, organizationId },
+  });
+  if (!node) throw new NotFoundError("GraphNode", nodeIndexId);
+
+  const [outgoing, incoming] = await Promise.all([
+    prisma.graphEdgeIndex.findMany({
+      where: { sourceNodeId: nodeIndexId, organizationId },
+      include: {
+        targetNode: {
+          select: {
+            id: true,
+            entityId: true,
+            label: true,
+            entityType: true,
+            identifier: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.graphEdgeIndex.findMany({
+      where: { targetNodeId: nodeIndexId, organizationId },
+      include: {
+        sourceNode: {
+          select: {
+            id: true,
+            entityId: true,
+            label: true,
+            entityType: true,
+            identifier: true,
+            status: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return { node, outgoing, incoming };
+}
+
+export async function expandSubgraph(nodeIds: string[], organizationId: string, depth: number = 1) {
+  const visited = new Set<string>();
+  const visitedEdges = new Set<string>();
+  const nodes: Record<string, GraphNodeIndex> = {};
+  const edges: SubgraphEdge[] = [];
+
+  async function expand(currentIds: string[], currentDepth: number): Promise<void> {
+    if (currentDepth > depth) return;
+
+    for (const nid of currentIds) {
+      if (visited.has(nid)) continue;
+      visited.add(nid);
+
+      const node = await prisma.graphNodeIndex.findFirst({
+        where: { id: nid, organizationId },
+      });
+      if (!node) continue;
+
+      nodes[nid] = node;
+      const rels = await prisma.graphEdgeIndex.findMany({
+        where: { OR: [{ sourceNodeId: nid }, { targetNodeId: nid }], organizationId },
+        include: {
+          sourceNode: { select: { id: true, entityId: true, label: true, entityType: true } },
+          targetNode: { select: { id: true, entityId: true, label: true, entityType: true } },
+        },
+      });
+
+      const next: string[] = [];
+      for (const rel of rels) {
+        if (!visitedEdges.has(rel.id)) {
+          visitedEdges.add(rel.id);
+          edges.push(rel);
+        }
+        if (!visited.has(rel.sourceNodeId)) next.push(rel.sourceNodeId);
+        if (!visited.has(rel.targetNodeId)) next.push(rel.targetNodeId);
+      }
+      if (next.length > 0) await expand(next, currentDepth + 1);
+    }
+  }
+
+  await expand(nodeIds, 0);
+  return { nodes: Object.values(nodes), edges };
+}
+
+export async function getSubgraph(
+  organizationId: string,
+  filters: { entityType?: string; limit?: number },
+) {
+  const { entityType, limit = 100 } = filters;
+  const where: Record<string, unknown> = { organizationId };
+  if (entityType) where.entityType = entityType;
+
+  const nodes = await prisma.graphNodeIndex.findMany({
+    where,
+    take: limit,
+    orderBy: { label: "asc" },
+  });
+
+  const nodeIds = nodes.map((n) => n.id);
+  const edges = await prisma.graphEdgeIndex.findMany({
+    where: {
+      OR: [{ sourceNodeId: { in: nodeIds } }, { targetNodeId: { in: nodeIds } }],
+      organizationId,
+    },
+    include: {
+      sourceNode: { select: { id: true, entityId: true, label: true, entityType: true } },
+      targetNode: { select: { id: true, entityId: true, label: true, entityType: true } },
+    },
+    take: limit * 5,
+  });
+
+  return { nodes, edges };
+}
+
+export async function exportGraph(organizationId: string) {
+  const [nodes, edges] = await Promise.all([
+    prisma.graphNodeIndex.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        entityId: true,
+        entityType: true,
+        identifier: true,
+        label: true,
+        status: true,
+      },
+    }),
+    prisma.graphEdgeIndex.findMany({
+      where: { organizationId },
+      include: {
+        sourceNode: { select: { entityId: true, identifier: true } },
+        targetNode: { select: { entityId: true, identifier: true } },
+      },
+    }),
+  ]);
+
+  return {
+    nodes: nodes.map((n) => ({
+      id: n.entityId,
+      type: n.entityType,
+      identifier: n.identifier,
+      label: n.label,
+      status: n.status,
+    })),
+    edges: edges.map((e) => ({
+      source: e.sourceNode.entityId,
+      target: e.targetNode.entityId,
+      type: e.relationshipType,
+    })),
+  };
+}
+
+export async function saveLayout(
+  organizationId: string,
+  name: string,
+  nodePositions: { nodeIndexId: string; x: number; y: number }[],
+) {
+  const layout = await prisma.graphLayout.create({
+    data: {
+      organizationId,
+      name,
+      nodes: {
+        create: nodePositions.map((np) => ({
+          nodeIndexId: np.nodeIndexId,
+          positionX: np.x,
+          positionY: np.y,
+        })),
+      },
+    },
+    include: { nodes: true },
+  });
+
+  logger.info("Graph layout saved", { layoutId: layout.id, name, nodeCount: nodePositions.length });
+  return layout;
+}
+
+export async function listLayouts(organizationId: string) {
+  return prisma.graphLayout.findMany({
+    where: { organizationId },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+}
+
+export async function getLayout(layoutId: string, organizationId: string) {
+  const layout = await prisma.graphLayout.findFirst({
+    where: { id: layoutId, organizationId },
+    include: {
+      nodes: {
+        include: {
+          layout: false,
+        },
+      },
+    },
+  });
+  if (!layout) throw new NotFoundError("GraphLayout", layoutId);
+  return layout;
+}
+
+export async function deleteLayout(layoutId: string, organizationId: string) {
+  const layout = await prisma.graphLayout.findFirst({
+    where: { id: layoutId, organizationId },
+  });
+  if (!layout) throw new NotFoundError("GraphLayout", layoutId);
+  await prisma.graphLayout.delete({ where: { id: layoutId } });
+}

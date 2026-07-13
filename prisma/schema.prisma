@@ -26,6 +26,11 @@ model User {
   memberships         OrganizationMember[]
   sentInvitations     Invitation[]        @relation("InvitationSender")
   authEvents          AuthEvent[]
+  createdEntities     EngineeringEntity[]    @relation("EntityCreatedBy")
+  updatedEntities     EngineeringEntity[]    @relation("EntityUpdatedBy")
+  createdRelationships EngineeringRelationship[]
+  createdVersions     EntityVersion[]
+  createdAuditLogs    EntityAuditLog[]
 
   @@index([email])
   @@index([status])
@@ -49,6 +54,12 @@ model Organization {
   owner     User                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
   members   OrganizationMember[]
   invitations Invitation[]
+  engineeringEntities   EngineeringEntity[]
+  engineeringRelationships EngineeringRelationship[]
+  graphNodeIndices     GraphNodeIndex[]
+  graphEdgeIndices     GraphEdgeIndex[]
+  graphLayouts         GraphLayout[]
+  graphSnapshots       GraphSnapshot[]
 
   @@index([slug])
   @@index([ownerId])
@@ -189,6 +200,180 @@ model AuthEvent {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+model EngineeringEntity {
+  id              String   @id @default(cuid())
+  organizationId  String
+  entityType      String
+  identifier      String
+  name            String
+  description     String?
+  version         String   @default("1.0.0")
+  status          String   @default("DRAFT")
+  tags            Json?
+  labels          Json?
+  metadata        Json?
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?               @relation("EntityCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?               @relation("EntityUpdatedBy", fields: [updatedById], references: [id])
+
+  sourceRelationships EngineeringRelationship[] @relation("SourceEntity")
+  targetRelationships EngineeringRelationship[] @relation("TargetEntity")
+  versions            EntityVersion[]
+  auditLogs           EntityAuditLog[]
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+  @@index([organizationId, entityType])
+  @@index([organizationId, status])
+  @@index([deletedAt])
+}
+
+model EngineeringRelationship {
+  id               String   @id @default(cuid())
+  organizationId   String
+  relationshipType String
+  sourceEntityId   String
+  targetEntityId   String
+  metadata         Json?
+  createdById      String?
+  createdAt        DateTime @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceEntity EngineeringEntity @relation("SourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
+  targetEntity EngineeringEntity @relation("TargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
+  createdBy    User?             @relation(fields: [createdById], references: [id])
+
+  @@unique([organizationId, sourceEntityId, targetEntityId, relationshipType])
+  @@index([organizationId])
+  @@index([organizationId, sourceEntityId])
+  @@index([organizationId, targetEntityId])
+  @@index([organizationId, relationshipType])
+}
+
+model EntityVersion {
+  id                String   @id @default(cuid())
+  entityId          String
+  version           String
+  snapshot          Json
+  changeDescription String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  entity    EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation(fields: [createdById], references: [id])
+
+  @@unique([entityId, version])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+model EntityAuditLog {
+  id          String   @id @default(cuid())
+  entityId    String
+  action      String
+  metadata    Json?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  entity    EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation(fields: [createdById], references: [id])
+
+  @@index([entityId])
+  @@index([entityId, action])
+  @@index([createdAt])
+}
+
+model GraphNodeIndex {
+  id              String   @id @default(cuid())
+  organizationId  String
+  entityId        String   @unique
+  entityType      String
+  identifier      String
+  label           String
+  status          String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outgoing     GraphEdgeIndex[]  @relation("EdgeSource")
+  incoming     GraphEdgeIndex[]  @relation("EdgeTarget")
+
+  @@index([organizationId])
+  @@index([organizationId, entityType])
+  @@index([organizationId, status])
+  @@index([entityId])
+}
+
+model GraphEdgeIndex {
+  id               String   @id @default(cuid())
+  organizationId   String
+  relationshipId   String   @unique
+  sourceNodeId     String
+  targetNodeId     String
+  relationshipType String
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceNode   GraphNodeIndex @relation("EdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   GraphNodeIndex @relation("EdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, sourceNodeId])
+  @@index([organizationId, targetNodeId])
+  @@index([organizationId, relationshipType])
+  @@index([sourceNodeId, targetNodeId])
+}
+
+model GraphLayout {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  nodes        GraphLayoutNode[]
+
+  @@index([organizationId])
+}
+
+model GraphLayoutNode {
+  id          String   @id @default(cuid())
+  layoutId    String
+  nodeIndexId String
+  positionX   Float
+  positionY   Float
+  pinned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  layout GraphLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+
+  @@unique([layoutId, nodeIndexId])
+  @@index([layoutId])
+}
+
+model GraphSnapshot {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  description     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model AuditLog {
