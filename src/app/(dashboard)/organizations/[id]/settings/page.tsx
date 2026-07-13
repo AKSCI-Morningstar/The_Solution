@@ -29,15 +29,17 @@ export default function OrganizationSettingsPage() {
   const router = useRouter();
   const [org, setOrg] = useState<Org | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [orgRes, membersRes] = await Promise.all([
+        const [orgRes, membersRes, meRes] = await Promise.all([
           fetch(`/api/organizations/${params.id}`),
           fetch(`/api/organizations/${params.id}/members`),
+          fetch("/api/auth/me"),
         ]);
 
         if (!orgRes.ok) {
@@ -51,6 +53,11 @@ export default function OrganizationSettingsPage() {
         if (membersRes.ok) {
           const membersData = await membersRes.json();
           if (!cancelled) setMembers(membersData.data);
+        }
+
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (!cancelled) setCurrentUserId(meData.data?.id ?? "");
         }
       } catch {
         if (!cancelled) router.push("/organizations");
@@ -73,8 +80,6 @@ export default function OrganizationSettingsPage() {
   }
 
   if (!org) return null;
-
-  const isOwner = org.role === "owner";
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">
@@ -102,17 +107,22 @@ export default function OrganizationSettingsPage() {
         </TabsList>
 
         <TabsContent value="settings" className="mt-6 max-w-lg">
-          {isOwner ? (
+          {org.role === "owner" || org.role === "admin" ? (
             <OrganizationSettingsForm organization={org} />
           ) : (
             <p className="text-muted-foreground text-sm">
-              Only organization owners can edit settings.
+              Only organization owners and admins can edit settings.
             </p>
           )}
         </TabsContent>
 
         <TabsContent value="members" className="mt-6 max-w-xl">
-          <MemberList organizationId={org.id} members={members} currentUserId="" />
+          <MemberList
+            organizationId={org.id}
+            members={members}
+            currentUserId={currentUserId}
+            currentUserRole={org.role}
+          />
         </TabsContent>
       </Tabs>
     </div>
