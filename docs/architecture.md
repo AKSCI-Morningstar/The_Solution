@@ -6,88 +6,203 @@ The Morningstar Solution is an Engineering Reality Platform built to verify engi
 
 ## Design Principles
 
-1. **Deterministic Behavior** — Given the same inputs, the system always produces the same outputs. No hidden state, no side effects without explicit declaration.
+1. **Deterministic Behavior** — Given the same inputs, the system always produces the same outputs.
 
-2. **Explainability** — Every decision, calculation, and transformation must be traceable and explainable. The system never produces results without a clear audit trail.
+2. **Explainability** — Every decision, calculation, and transformation must be traceable and explainable.
 
-3. **Traceability** — Every piece of data has a provenance chain. Every computation links back to its source data and the logic that produced it.
+3. **Traceability** — Every piece of data has a provenance chain linking back to source and logic.
 
-4. **Maintainability** — Code is organized by domain features. Changes in one feature module do not cascade to others. Strict typing catches errors at compile time.
+4. **Maintainability** — Code is organized by domain features with strict dependency rules.
 
-5. **Scalability** — The architecture supports horizontal scaling. Stateless API routes, database-level pagination, and feature-based code splitting ensure the platform grows with demand.
+5. **Scalability** — The architecture supports horizontal scaling, feature-based code splitting, and stateless API routes.
 
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                 Client Layer                │
-│          (Next.js App Router + React)       │
-├─────────────────────────────────────────────┤
-│              Feature Modules                │
-│      (domain logic, validation, types)      │
-├─────────────────────────────────────────────┤
-│               API Layer                     │
-│        (Next.js API Route Handlers)         │
-├─────────────────────────────────────────────┤
-│              Data Layer                     │
-│         (Prisma ORM + PostgreSQL)           │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    Presentation Layer                     │
+│              app/ (Next.js App Router pages)              │
+├──────────────────────────────────────────────────────────┤
+│                    Feature Modules                        │
+│         features/<domain>/ (components, hooks, types)     │
+├──────────────────────────────────────────────────────────┤
+│                   Application Shell                      │
+│         components/layout/ (Shell, Sidebar, Header)       │
+├──────────────────────────────────────────────────────────┤
+│                   Shared Components                      │
+│         components/ui/, components/shared/                │
+├──────────────────────────────────────────────────────────┤
+│                   Shared Packages                         │
+│   shared/{types, constants, utils, validation, config,    │
+│           errors, logging}/                               │
+├──────────────────────────────────────────────────────────┤
+│                   Infrastructure                          │
+│         providers/, server/, config/                      │
+├──────────────────────────────────────────────────────────┤
+│                   Data Layer                              │
+│         Prisma ORM + PostgreSQL                           │
+└──────────────────────────────────────────────────────────┘
 ```
+
+## Layer Responsibilities
+
+### Presentation Layer (`app/`)
+
+- Next.js App Router pages and layouts
+- Route groups for different application sections
+- API route handlers (thin, delegate to feature modules)
+- No business logic — route orchestration only
+
+### Feature Modules (`features/<domain>/`)
+
+Each feature module is self-contained with:
+
+- `components/` — feature-specific UI components
+- `hooks/` — feature-specific custom hooks
+- `types/` — feature-specific type definitions
+- `index.ts` — public API barrel export
+
+Feature modules communicate only through shared packages. They never import directly from other feature modules.
+
+### Application Shell (`components/layout/`)
+
+- `Shell` — main layout wrapper (sidebar + header + content + footer)
+- `Sidebar` — navigation sidebar with route links
+- `Header` — top app bar with breadcrumbs and user menu
+- `Breadcrumbs` — breadcrumb navigation trail
+- `Footer` — application footer
+
+### Shared UI (`components/ui/`, `components/shared/`)
+
+- `ui/` — primitive components (Button, Input, etc.)
+- `shared/` — compound components built from primitives
+
+### Shared Packages (`shared/*/`)
+
+- `types/` — domain contracts and interfaces
+- `constants/` — centralized constants (routes, navigation, app metadata)
+- `utils/` — pure utility functions
+- `validation/` — shared Zod validation schemas
+- `config/` — environment configuration access
+- `errors/` — enterprise error class hierarchy
+- `logging/` — centralized logging utilities
+
+### Infrastructure (`providers/`, `server/`, `config/`)
+
+- `providers/` — React context providers (theme, auth, notifications, feature flags)
+- `server/` — server-side infrastructure (future: DB repositories, external integrations)
+- `config/` — application-level configuration
+
+## Dependency Rules
+
+```
+app/ → features/ → components/layout/ → components/ui/ → shared/
+                                                              ↑
+providers/ ---------------------------------------------------┘
+  server/ ----------------------------------------------------┘
+```
+
+- Inward-only dependency flow
+- `shared/` has zero internal dependencies
+- No circular dependencies
+- Feature modules cannot import other feature modules directly
 
 ## Module Structure
 
-Each feature module in `src/features/` is self-contained:
-
 ```
-features/
-└── dashboard/
-    ├── components/    # Feature-specific UI components
-    ├── hooks/         # Feature-specific hooks
-    ├── types/         # Feature-specific types
-    └── index.ts       # Public API (barrel export)
+src/
+├── app/                         # Next.js App Router
+│   ├── (dashboard)/             # Authenticated app route group
+│   │   ├── _components/         # Shared page components (PagePlaceholder)
+│   │   ├── layout.tsx           # Dashboard layout with Shell
+│   │   ├── dashboard/           # Dashboard page
+│   │   ├── documents/           # Documents page (placeholder)
+│   │   ├── knowledge-graph/     # Knowledge Graph page (placeholder)
+│   │   └── ...                  # Other feature pages
+│   ├── api/                     # API route handlers
+│   ├── layout.tsx               # Root layout with providers
+│   └── page.tsx                 # Marketing/home page
+├── components/
+│   ├── layout/                  # Shell, Sidebar, Header, Footer, Breadcrumbs
+│   ├── shared/                  # Compound/shared components
+│   └── ui/                      # Primitives (Button, Input)
+├── features/                    # Feature modules
+│   ├── auth/
+│   ├── dashboard/
+│   ├── documents/
+│   └── ...                      # One per domain
+├── providers/                   # React context providers
+│   ├── index.ts                 # AppProvider composition root
+│   ├── theme-provider.tsx
+│   ├── error-boundary.tsx
+│   └── ...                      # Future: AuthProvider, NotificationProvider
+├── shared/                      # Shared packages (zero dependencies)
+│   ├── config/
+│   ├── constants/
+│   ├── errors/
+│   ├── logging/
+│   ├── types/
+│   ├── utils/
+│   └── validation/
+├── hooks/                       # Shared custom hooks
+├── lib/                         # Legacy helpers (re-exports from shared)
+├── styles/                      # Global CSS
+├── types/                       # Legacy types (re-exports from shared)
+└── server/                      # Server-side infrastructure
 ```
-
-Feature modules communicate through:
-
-- Shared types in `src/types/`
-- Shared utilities in `src/lib/`
-- API routes in `src/app/api/`
 
 ## Data Flow
 
 ```
-User Action → React Component → Hook/Action → API Route → Validation (Zod) → Prisma → PostgreSQL
-                                                                          ↑
-                                                           Audit Trail ←────┘
+User Action → React Component → Hook/Action → API Route → Validation → Service → Prisma → PostgreSQL
 ```
 
 ## Error Handling
 
-The platform uses Result types instead of exceptions:
+Uses a typed `Result<T, E>` pattern and an `AppError` class hierarchy:
 
-```typescript
-type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
+- `AppError` — base error with code, statusCode, details
+- `ValidationError` — field-level validation errors
+- `NotFoundError` — resource not found
+- `UnauthorizedError` — authentication required
+- `ForbiddenError` — insufficient permissions
+- `ConfigurationError` — missing configuration
+
+## Routing Architecture
+
+The application uses Next.js route groups to separate concerns:
+
+- `/` — Marketing/home page (no sidebar)
+- `/dashboard/**` — Authenticated app (with Shell/Sidebar/Header)
+- `/api/**` — API route handlers
+
+Route groups:
+
+- `(dashboard)` — wraps all authenticated routes with the Shell layout
+
+## Providers Architecture
+
+The `AppProvider` composes all global providers:
+
 ```
-
-This ensures errors are explicit, traceable, and never silently swallowed.
+AppProvider
+├── ErrorBoundary
+└── ThemeProvider
+    └── FeatureFlagProvider (future)
+        └── AuthProvider (future)
+            └── NotificationProvider (future)
+```
 
 ## Security Model
 
-- Environment variables for configuration (never hardcoded secrets)
+- Environment variables for configuration
 - Zod validation on all API inputs
-- Prisma parameterized queries (SQL injection prevention)
-- `poweredByHeader: false` in production
 - Strict TypeScript prevents type-level vulnerabilities
+- `poweredByHeader: false` in production
 
 ## Testing Strategy
 
-- **Unit tests** (Vitest): Pure function testing, validation logic, utility functions
-- **E2E tests** (Playwright): User flows, page rendering, API integration
-- **Type tests**: TypeScript compiler acts as a test suite via strict mode
-
-## Future Considerations
-
-- Authentication/authorization layer
-- Audit logging with full traceability
-- Real-time event streaming
-- AI-assisted verification (Phase 2+)
+- **Unit tests** (Vitest): Pure functions, utilities, validation logic
+- **Component tests**: UI components and feature components
+- **E2E tests** (Playwright): Critical user flows, page rendering
+- **TypeScript**: Compiler as test suite via strict mode
