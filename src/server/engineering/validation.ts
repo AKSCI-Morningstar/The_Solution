@@ -60,6 +60,8 @@ export const entityFilterSchema = z.object({
   entityType: entityTypeSchema.optional(),
   status: entityStatusSchema.optional(),
   search: z.string().optional(),
+  sort: z.enum(["name", "identifier", "updatedAt", "createdAt"]).optional(),
+  order: z.enum(["asc", "desc"]).optional(),
   ...paginationSchema.shape,
 });
 

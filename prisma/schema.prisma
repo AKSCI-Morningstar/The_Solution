@@ -22,25 +22,28 @@ model User {
 
   sessions                Session[]
   verificationTokens      VerificationToken[]
-  ownedOrganizations      Organization[]             @relation("OrganizationOwner")
+  ownedOrganizations      Organization[]              @relation("OrganizationOwner")
   memberships             OrganizationMember[]
-  sentInvitations         Invitation[]               @relation("InvitationSender")
+  sentInvitations         Invitation[]                @relation("InvitationSender")
   authEvents              AuthEvent[]
-  createdEntities         EngineeringEntity[]        @relation("EntityCreatedBy")
-  updatedEntities         EngineeringEntity[]        @relation("EntityUpdatedBy")
+  createdEntities         EngineeringEntity[]         @relation("EntityCreatedBy")
+  updatedEntities         EngineeringEntity[]         @relation("EntityUpdatedBy")
   createdRelationships    EngineeringRelationship[]
   createdVersions         EntityVersion[]
   createdAuditLogs        EntityAuditLog[]
-  uploadedDocuments       IngestionDocument[]        @relation("DocumentUploadedBy")
-  createdDocumentVersions IngestionDocumentVersion[] @relation("DocumentVersionCreatedBy")
-  createdIngestionJobs    IngestionJob[]             @relation("IngestionJobCreatedBy")
-  ownedRules              Rule[]                     @relation("RuleOwner")
-  createdRules            Rule[]                     @relation("RuleCreatedBy")
-  updatedRules            Rule[]                     @relation("RuleUpdatedBy")
-  publishedRules          Rule[]                     @relation("RulePublishedBy")
-  createdRuleVersions     RuleVersion[]              @relation("RuleVersionCreatedBy")
+  uploadedDocuments       IngestionDocument[]         @relation("DocumentUploadedBy")
+  createdDocumentVersions IngestionDocumentVersion[]  @relation("DocumentVersionCreatedBy")
+  createdIngestionJobs    IngestionJob[]              @relation("IngestionJobCreatedBy")
+  ownedRules              Rule[]                      @relation("RuleOwner")
+  createdRules            Rule[]                      @relation("RuleCreatedBy")
+  updatedRules            Rule[]                      @relation("RuleUpdatedBy")
+  publishedRules          Rule[]                      @relation("RulePublishedBy")
+  createdRuleVersions     RuleVersion[]               @relation("RuleVersionCreatedBy")
   createdRuleFragments    RuleFragment[]
-  triggeredRuleExecutions RuleExecutionResult[]      @relation("RuleExecutionTriggeredBy")
+  triggeredRuleExecutions RuleExecutionResult[]       @relation("RuleExecutionTriggeredBy")
+  detectedContradictions  Contradiction[]             @relation("ContradictionDetectedBy")
+  resolvedContradictions  Contradiction[]             @relation("ContradictionResolvedBy")
+  contradictionLogActions ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
 
   @@index([email])
   @@index([status])
@@ -79,6 +82,7 @@ model Organization {
   ruleFragments            RuleFragment[]
   ruleDependencies         RuleDependency[]
   ruleExecutionResults     RuleExecutionResult[]
+  contradictions           Contradiction[]
 
   @@index([slug])
   @@index([ownerId])
@@ -792,4 +796,55 @@ model RuleExecutionResult {
   @@index([subjectEntityId])
   @@index([batchId])
   @@index([outcome])
+}
+
+model Contradiction {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  type                String
+  severity            String    @default("NEEDS_REVIEW")
+  status              String    @default("DETECTED")
+  label               String
+  description         String
+  sourceEntityIds     Json      @default("[]")
+  sourceDocumentIds   Json      @default("[]")
+  supportingEvidence  Json      @default("[]")
+  conflictingEvidence Json      @default("[]")
+  traceabilityChain   Json      @default("[]")
+  affectedEntities    Json      @default("[]")
+  detectedById        String?
+  resolvedById        String?
+  resolutionNotes     String?
+  detectedAt          DateTime  @default(now())
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  detectedBy    User?                       @relation("ContradictionDetectedBy", fields: [detectedById], references: [id])
+  resolvedBy    User?                       @relation("ContradictionResolvedBy", fields: [resolvedById], references: [id])
+  lifecycleLogs ContradictionLifecycleLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+  @@index([organizationId, severity])
+  @@index([detectedAt])
+}
+
+model ContradictionLifecycleLog {
+  id              String   @id @default(cuid())
+  contradictionId String
+  action          String
+  fromStatus      String?
+  toStatus        String
+  metadata        Json?
+  performedById   String?
+  createdAt       DateTime @default(now())
+
+  contradiction Contradiction @relation(fields: [contradictionId], references: [id], onDelete: Cascade)
+  performedBy   User?         @relation("ContradictionLogPerformedBy", fields: [performedById], references: [id])
+
+  @@index([contradictionId])
+  @@index([createdAt])
 }

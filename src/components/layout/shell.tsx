@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { Footer } from "./footer";
+import { SearchCommandPalette } from "@/features/search";
 
 interface ShellProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ export function Shell({ children }: ShellProps) {
         <main className="flex-1">{children}</main>
         <Footer />
       </div>
+      <SearchCommandPalette />
     </div>
   );
 }

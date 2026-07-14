@@ -141,7 +141,7 @@ export function GraphExplorer() {
         </div>
 
         {selectedInfo && (
-          <div className="w-72 shrink-0 rounded-lg border bg-white p-4">
+          <div className="border-border bg-background w-72 shrink-0 rounded-lg border p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold capitalize">{selectedInfo.type}</h3>
               <button

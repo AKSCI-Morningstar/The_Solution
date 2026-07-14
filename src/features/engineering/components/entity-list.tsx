@@ -1,10 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Filter, Search } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import {
+  Plus,
+  ListFilter as Filter,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/shared/utils";
 import { TypeBadge } from "./type-badge";
 import { StatusBadge } from "./status-badge";
 import { EntityListSkeleton } from "./loading-state";
@@ -32,6 +43,22 @@ interface EntityListProps {
   onCreate?: () => void;
 }
 
+type SortField = "name" | "identifier" | "updatedAt";
+type SortOrder = "asc" | "desc";
+
+function SortIcon({
+  field,
+  sortField,
+  sortOrder,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortOrder: SortOrder;
+}) {
+  if (sortField !== field) return <ArrowUpDown className="size-3 opacity-40" />;
+  return sortOrder === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />;
+}
+
 export function EntityList({ onCreate }: EntityListProps) {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [total, setTotal] = useState(0);
@@ -43,6 +70,10 @@ export function EntityList({ onCreate }: EntityListProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [sortField, setSortField] = useState<SortField>("updatedAt");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +104,8 @@ export function EntityList({ onCreate }: EntityListProps) {
         if (search) params.set("search", search);
         if (typeFilter) params.set("entityType", typeFilter);
         if (statusFilter) params.set("status", statusFilter);
+        params.set("sort", sortField);
+        params.set("order", sortOrder);
 
         const res = await fetch(`/api/engineering/entities?${params}`);
         if (!res.ok) {
@@ -85,6 +118,7 @@ export function EntityList({ onCreate }: EntityListProps) {
           setEntities(json.data);
           setTotal(json.total);
           setTotalPages(json.totalPages);
+          setSelectedIds(new Set());
         }
       } catch {
         if (!cancelled) setError("Failed to load entities");
@@ -96,16 +130,60 @@ export function EntityList({ onCreate }: EntityListProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, search, typeFilter, statusFilter]);
+  }, [page, search, typeFilter, statusFilter, sortField, sortOrder]);
 
-  function handleSearch() {
+  const handleSearch = useCallback(() => {
     setPage(1);
-  }
+  }, []);
+
+  const toggleSort = useCallback(
+    (field: SortField) => {
+      setSortField(field);
+      setSortOrder((prev) => (field === sortField ? (prev === "asc" ? "desc" : "asc") : "asc"));
+    },
+    [sortField],
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === entities.length) return new Set();
+      return new Set(entities.map((e) => e.id));
+    });
+  }, [entities]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setBulkActionLoading(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch(`/api/engineering/entities/${id}`, { method: "DELETE" }),
+        ),
+      );
+      setSelectedIds(new Set());
+      setPage(1);
+      // Reload by toggling page
+      window.location.reload();
+    } catch {
+      setError("Failed to delete selected entities");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }, [selectedIds]);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-[200px] flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
             placeholder="Search entities..."
@@ -149,6 +227,26 @@ export function EntityList({ onCreate }: EntityListProps) {
         )}
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="border-border bg-muted/50 flex items-center justify-between rounded-lg border px-4 py-2">
+          <span className="text-foreground text-sm font-medium">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={bulkActionLoading}
+            >
+              <Trash2 className="mr-1.5 size-3.5" />
+              Delete Selected
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <EntityListSkeleton />
       ) : error ? (
@@ -160,38 +258,97 @@ export function EntityList({ onCreate }: EntityListProps) {
           <p className="text-muted-foreground text-sm">
             {total} entity{total !== 1 ? "ies" : "y"}
           </p>
-          <div className="divide-border border-border divide-y rounded-lg border">
-            {entities.map((entity) => (
-              <a
-                key={entity.id}
-                href={`/entities/${entity.id}`}
-                className="hover:bg-muted/50 flex items-center justify-between px-4 py-3 transition-colors"
+          <div className="border-border divide-border overflow-hidden rounded-lg border">
+            <div className="border-border bg-muted/30 flex items-center gap-3 border-b px-4 py-2.5">
+              <Checkbox
+                checked={entities.length > 0 && selectedIds.size === entities.length}
+                onChange={toggleSelectAll}
+                aria-label="Select all"
+              />
+              <button
+                onClick={() => toggleSort("name")}
+                className="text-muted-foreground hover:text-foreground flex min-w-[180px] flex-1 items-center gap-1.5 text-left text-xs font-medium tracking-wide uppercase"
               >
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-lg text-xs font-medium">
-                    {entity.identifier.slice(0, 3)}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground font-medium">{entity.name}</span>
-                      <span className="text-muted-foreground text-xs">{entity.identifier}</span>
+                Name
+                <SortIcon field="name" sortField={sortField} sortOrder={sortOrder} />
+              </button>
+              <button
+                onClick={() => toggleSort("identifier")}
+                className="text-muted-foreground hover:text-foreground hidden min-w-[120px] flex-1 items-center gap-1.5 text-left text-xs font-medium tracking-wide uppercase sm:flex"
+              >
+                Identifier
+                <SortIcon field="identifier" sortField={sortField} sortOrder={sortOrder} />
+              </button>
+              <span className="text-muted-foreground hidden flex-1 text-xs font-medium tracking-wide uppercase md:block">
+                Type
+              </span>
+              <span className="text-muted-foreground hidden flex-1 text-xs font-medium tracking-wide uppercase md:block">
+                Relationships
+              </span>
+              <button
+                onClick={() => toggleSort("updatedAt")}
+                className="text-muted-foreground hover:text-foreground hidden min-w-[100px] flex-1 items-center gap-1.5 text-right text-xs font-medium tracking-wide uppercase sm:flex"
+              >
+                Updated
+                <SortIcon field="updatedAt" sortField={sortField} sortOrder={sortOrder} />
+              </button>
+              <span className="text-muted-foreground min-w-[80px] text-right text-xs font-medium tracking-wide uppercase">
+                Status
+              </span>
+            </div>
+            {entities.map((entity) => {
+              const relCount =
+                entity._count.sourceRelationships + entity._count.targetRelationships;
+              return (
+                <div
+                  key={entity.id}
+                  className={cn(
+                    "hover:bg-surface-hover flex items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0",
+                    selectedIds.has(entity.id) && "bg-muted/40",
+                  )}
+                >
+                  <Checkbox
+                    checked={selectedIds.has(entity.id)}
+                    onChange={() => toggleSelect(entity.id)}
+                    aria-label={`Select ${entity.name}`}
+                  />
+                  <Link
+                    href={`/entities/${entity.id}`}
+                    className="flex min-w-[180px] flex-1 items-center gap-3"
+                  >
+                    <div className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-medium">
+                      {entity.identifier.slice(0, 3)}
                     </div>
-                    <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                      <TypeBadge type={entity.entityType} />
-                      <span>v{entity.version}</span>
-                      <span>
-                        {entity._count.sourceRelationships + entity._count.targetRelationships}{" "}
-                        relationship
-                        {entity._count.sourceRelationships + entity._count.targetRelationships !== 1
-                          ? "s"
-                          : ""}
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-foreground truncate text-sm font-medium">
+                        {entity.name}
+                      </span>
+                      <span className="text-muted-foreground truncate text-xs">
+                        {entity.identifier}
                       </span>
                     </div>
+                  </Link>
+                  <Link
+                    href={`/entities/${entity.id}`}
+                    className="text-muted-foreground hidden min-w-[120px] flex-1 truncate text-sm sm:block"
+                  >
+                    {entity.identifier}
+                  </Link>
+                  <div className="hidden flex-1 md:block">
+                    <TypeBadge type={entity.entityType} />
+                  </div>
+                  <span className="text-muted-foreground hidden flex-1 text-sm md:block">
+                    {relCount} relationship{relCount !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-muted-foreground hidden min-w-[100px] flex-1 text-right text-xs sm:block">
+                    {new Date(entity.updatedAt).toLocaleDateString()}
+                  </span>
+                  <div className="min-w-[80px] text-right">
+                    <StatusBadge status={entity.status} />
                   </div>
                 </div>
-                <StatusBadge status={entity.status} />
-              </a>
-            ))}
+              );
+            })}
           </div>
 
           {totalPages > 1 && (

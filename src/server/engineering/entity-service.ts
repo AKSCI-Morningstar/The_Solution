@@ -81,7 +81,7 @@ export async function getEntity(entityId: string, organizationId: string) {
 export async function listEntities(organizationId: string, filters: Record<string, string>) {
   const parsed = entityFilterSchema.safeParse(filters);
   if (!parsed.success) throw new ValidationError(parsed.error.flatten().fieldErrors);
-  const { entityType, status, search, page, pageSize } = parsed.data;
+  const { entityType, status, search, sort, order, page, pageSize } = parsed.data;
   const where: Record<string, unknown> = { organizationId, deletedAt: null };
 
   if (entityType) where.entityType = entityType;
@@ -94,12 +94,14 @@ export async function listEntities(organizationId: string, filters: Record<strin
     ];
   }
 
+  const orderBy = sort ? { [sort]: order ?? "asc" } : { updatedAt: "desc" as const };
+
   const [data, total] = await Promise.all([
     prisma.engineeringEntity.findMany({
       where,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      orderBy: { updatedAt: "desc" },
+      orderBy,
       include: {
         createdBy: { select: { id: true, name: true } },
         updatedBy: { select: { id: true, name: true } },

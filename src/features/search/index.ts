@@ -1,0 +1,1 @@
+export { SearchCommandPalette } from "./components";
