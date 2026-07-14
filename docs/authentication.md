@@ -10,7 +10,7 @@ The Morningstar Solution uses a session-based authentication system built on Nex
 
 1. User submits email, password, and optional name via the registration form
 2. Client-side validation checks password length (≥8) and confirmation match
-3. `POST /api/auth/register` calls `registerUser()` in the auth service
+3. `POST /api/auth/register` calls `registerUser()` in the auth service, which first checks an in-process rate limiter keyed by source IP (5 attempts per 15 minutes) - a request over the threshold is rejected with `429` before the duplicate-email check ever runs
 4. Service checks for duplicate email, hashes password with `scrypt`, creates User record
 5. AuthEvent logged as `user.registered`
 6. Returns the new user (without password hash)
@@ -43,7 +43,7 @@ The Morningstar Solution uses a session-based authentication system built on Nex
 
 ### Password Reset
 
-1. User requests reset via `POST /api/auth/forgot-password`
+1. User requests reset via `POST /api/auth/forgot-password`, which is rate-limited in-process (5 attempts per 15 minutes, keyed by email and by source IP independently) before the user lookup runs - a rate-limited request returns the same generic response as a successful one, so the response shape never reveals whether the limiter or the email lookup is why nothing was sent
 2. A `VerificationToken` of type `password_reset` is created (1-hour expiry); the raw token is a random 48-byte hex string, but only its SHA-256 hash is persisted
 3. `POST /api/auth/reset-password` consumes the token (looked up by hash), hashes the new password, updates the user
 4. Every existing session for that user is destroyed as part of the same reset - a compromised account can't be "reset back" into by whoever held the old password's session

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loginUser } from "@/server/auth";
+import { rateLimitedResponse } from "@/server/security";
 import { AppError, RateLimitedError } from "@/shared/errors";
 
 export async function POST(request: Request) {
@@ -29,11 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: result.user });
   } catch (error) {
     if (error instanceof RateLimitedError) {
-      const retryAfterSeconds = (error.details?.retryAfterSeconds as number | undefined) ?? 60;
-      return NextResponse.json(
-        { error: error.message, code: error.code },
-        { status: error.statusCode, headers: { "Retry-After": String(retryAfterSeconds) } },
-      );
+      return rateLimitedResponse(error);
     }
     if (error instanceof AppError) {
       return NextResponse.json(

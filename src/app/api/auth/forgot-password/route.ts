@@ -13,7 +13,10 @@ export async function POST(request: Request) {
       );
     }
 
-    await requestPasswordReset(email.toLowerCase().trim());
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined;
+
+    await requestPasswordReset(email.toLowerCase().trim(), ipAddress);
 
     return NextResponse.json({
       data: { message: "If the email exists, a reset link has been sent" },

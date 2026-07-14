@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { registerUser } from "@/server/auth";
-import { ValidationError, AppError } from "@/shared/errors";
+import { rateLimitedResponse } from "@/server/security";
+import { ValidationError, AppError, RateLimitedError } from "@/shared/errors";
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +24,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await registerUser({ email: email.toLowerCase().trim(), password, name });
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined;
+
+    const result = await registerUser({
+      email: email.toLowerCase().trim(),
+      password,
+      name,
+      ipAddress,
+    });
 
     return NextResponse.json({ data: result.user }, { status: 201 });
   } catch (error) {
+    if (error instanceof RateLimitedError) {
+      return rateLimitedResponse(error);
+    }
     if (error instanceof ValidationError) {
       return NextResponse.json(
         { error: error.message, code: error.code, details: error.details },

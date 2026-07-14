@@ -7,13 +7,19 @@ import {
   validateSession,
 } from "./session-service";
 import { createVerificationToken, consumeVerificationToken } from "./token-service";
-import { checkLoginRateLimit, clearLoginAttempts, recordFailedLoginAttempt } from "./rate-limiter";
+import {
+  loginRateLimiter,
+  passwordResetRateLimiter,
+  recordSecurityEvent,
+  registrationRateLimiter,
+} from "@/server/security";
 import { AppError, ValidationError, UnauthorizedError, RateLimitedError } from "@/shared/errors";
 
 export interface RegisterInput {
   email: string;
   password: string;
   name?: string;
+  ipAddress?: string;
 }
 
 interface RegisterResult {
@@ -21,10 +27,17 @@ interface RegisterResult {
 }
 
 export async function registerUser(input: RegisterInput): Promise<RegisterResult> {
-  const { email, password, name } = input;
+  const { email, password, name, ipAddress } = input;
+
+  const ipKey = ipAddress ? `ip:${ipAddress}` : null;
+  const ipRetryAfter = ipKey ? registrationRateLimiter.check(ipKey) : null;
+  if (ipRetryAfter !== null) {
+    throw new RateLimitedError("Too many registration attempts. Try again later.", ipRetryAfter);
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
+    if (ipKey) registrationRateLimiter.record(ipKey);
     throw new ValidationError({ email: ["Email is already registered"] });
   }
 
@@ -34,8 +47,10 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
     data: { email, name, passwordHash },
   });
 
+  if (ipKey) registrationRateLimiter.record(ipKey);
+
   await prisma.authEvent.create({
-    data: { userId: user.id, action: "user.registered", metadata: { email } },
+    data: { userId: user.id, action: "user.registered", metadata: { email }, ipAddress },
   });
 
   return { user: { id: user.id, email: user.email, name: user.name } };
@@ -59,30 +74,31 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
   const emailKey = `email:${email}`;
   const ipKey = ipAddress ? `ip:${ipAddress}` : null;
 
-  const emailRetryAfter = checkLoginRateLimit(emailKey);
-  const ipRetryAfter = ipKey ? checkLoginRateLimit(ipKey) : null;
+  const emailRetryAfter = loginRateLimiter.check(emailKey);
+  const ipRetryAfter = ipKey ? loginRateLimiter.check(ipKey) : null;
   const retryAfter = emailRetryAfter ?? ipRetryAfter;
   if (retryAfter !== null) {
+    await recordSecurityEvent("auth.rate_limited", { ipAddress, userAgent, metadata: { email } });
     throw new RateLimitedError("Too many login attempts. Try again later.", retryAfter);
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    recordFailedLoginAttempt(emailKey);
-    if (ipKey) recordFailedLoginAttempt(ipKey);
+    loginRateLimiter.record(emailKey);
+    if (ipKey) loginRateLimiter.record(ipKey);
     throw new UnauthorizedError("Invalid email or password");
   }
 
   if (user.status !== "active") {
-    recordFailedLoginAttempt(emailKey);
-    if (ipKey) recordFailedLoginAttempt(ipKey);
+    loginRateLimiter.record(emailKey);
+    if (ipKey) loginRateLimiter.record(ipKey);
     throw new UnauthorizedError("Account is disabled");
   }
 
   const isValid = verifyPassword(password, user.passwordHash);
   if (!isValid) {
-    recordFailedLoginAttempt(emailKey);
-    if (ipKey) recordFailedLoginAttempt(ipKey);
+    loginRateLimiter.record(emailKey);
+    if (ipKey) loginRateLimiter.record(ipKey);
     await prisma.authEvent.create({
       data: {
         userId: user.id,
@@ -95,7 +111,7 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
     throw new UnauthorizedError("Invalid email or password");
   }
 
-  clearLoginAttempts(emailKey);
+  loginRateLimiter.clear(emailKey);
 
   await createSession(user.id, { rememberMe, userAgent, ipAddress });
 
@@ -156,14 +172,29 @@ export async function getCurrentUser(): Promise<CurrentUserResult | null> {
   };
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(email: string, ipAddress?: string): Promise<void> {
+  const emailKey = `email:${email}`;
+  const ipKey = ipAddress ? `ip:${ipAddress}` : null;
+
+  const emailRetryAfter = passwordResetRateLimiter.check(emailKey);
+  const ipRetryAfter = ipKey ? passwordResetRateLimiter.check(ipKey) : null;
+  if (emailRetryAfter !== null || ipRetryAfter !== null) {
+    await recordSecurityEvent("auth.rate_limited", {
+      ipAddress,
+      metadata: { email, flow: "password_reset" },
+    });
+    return; // same response shape as success - does not reveal whether the rate limit or the email lookup is why nothing was sent
+  }
+  passwordResetRateLimiter.record(emailKey);
+  if (ipKey) passwordResetRateLimiter.record(ipKey);
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return;
 
   await createVerificationToken(user.id, "password_reset", 1);
 
   await prisma.authEvent.create({
-    data: { userId: user.id, action: "auth.password.reset.requested" },
+    data: { userId: user.id, action: "auth.password.reset.requested", ipAddress },
   });
 }
 

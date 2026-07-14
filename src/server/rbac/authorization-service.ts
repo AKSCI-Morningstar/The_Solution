@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db";
 import { validateSession } from "@/server/auth/session-service";
+import { recordSecurityEvent } from "@/server/security";
 import { ForbiddenError, NotFoundError } from "@/shared/errors";
 import { type PermissionString, DEFAULT_ROLES } from "./permissions";
 
@@ -61,6 +62,10 @@ export async function requirePermission(
 ): Promise<void> {
   const hasPermission = await checkPermission(organizationId, userId, permission);
   if (!hasPermission) {
+    await recordSecurityEvent("rbac.permission_denied", {
+      userId,
+      metadata: { organizationId, permission },
+    });
     throw new ForbiddenError(errorMessage ?? "Insufficient permissions");
   }
 }
