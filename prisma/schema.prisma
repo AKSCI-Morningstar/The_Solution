@@ -44,6 +44,8 @@ model User {
   detectedContradictions  Contradiction[]             @relation("ContradictionDetectedBy")
   resolvedContradictions  Contradiction[]             @relation("ContradictionResolvedBy")
   contradictionLogActions ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
+  triggeredOrchestrations OrchestrationRun[]          @relation("OrchestrationTriggeredBy")
+  notifications           Notification[]
 
   @@index([email])
   @@index([status])
@@ -83,6 +85,8 @@ model Organization {
   ruleDependencies         RuleDependency[]
   ruleExecutionResults     RuleExecutionResult[]
   contradictions           Contradiction[]
+  orchestrationRuns        OrchestrationRun[]
+  notifications            Notification[]
 
   @@index([slug])
   @@index([ownerId])
@@ -849,5 +853,90 @@ model ContradictionLifecycleLog {
   performedBy   User?         @relation("ContradictionLogPerformedBy", fields: [performedById], references: [id])
 
   @@index([contradictionId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Engineering Reasoning Orchestrator
+//
+// Coordinates the existing Knowledge Graph, Ingestion, Evidence Resolution,
+// Contradiction, and Rule engines into one deterministic, repeatable
+// evaluation per run. The Orchestrator never performs its own reasoning - it
+// only sequences calls into those engines and aggregates their outputs.
+// ---------------------------------------------------------------------------
+
+model OrchestrationRun {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  status              String    @default("QUEUED")
+  subjectEntityId     String
+  inputs              Json
+  currentStage        String?
+  stageIndex          Int       @default(0)
+  totalStages         Int       @default(10)
+  cancelRequested     Boolean   @default(false)
+  assessment          Json?
+  subjectEntityIds    Json      @default("[]")
+  evidenceSummary     Json?
+  ruleResultIds       Json      @default("[]")
+  contradictionIds    Json      @default("[]")
+  traceabilitySummary Json?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  durationMs          Int?
+  errorStage          String?
+  errorMessage        String?
+  triggeredById       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  triggeredBy  User?                   @relation("OrchestrationTriggeredBy", fields: [triggeredById], references: [id])
+  stageLogs    OrchestrationStageLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, subjectEntityId])
+  @@index([triggeredById])
+  @@index([createdAt])
+}
+
+model OrchestrationStageLog {
+  id           String    @id @default(cuid())
+  runId        String
+  stageName    String
+  stageIndex   Int
+  status       String
+  attempt      Int       @default(1)
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  errorMessage String?
+  output       Json?
+  metadata     Json?
+
+  run OrchestrationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([runId, stageIndex])
+}
+
+model Notification {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String
+  title          String
+  message        String
+  link           String?
+  isRead         Boolean  @default(false)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
+  @@index([userId, isRead])
   @@index([createdAt])
 }

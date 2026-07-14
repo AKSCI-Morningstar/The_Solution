@@ -16,6 +16,7 @@ export const ROUTES = {
   ai: "/ai",
   notifications: "/notifications",
   ingestion: "/ingestion",
+  orchestrator: "/orchestrator",
 } as const;
 
 export interface SidebarNavItem {
@@ -64,6 +65,7 @@ export const SIDEBAR_NAV: SidebarNavEntry[] = [
       { label: "Evidence", href: ROUTES.evidence, icon: "ShieldCheck" },
       { label: "Rules", href: ROUTES.rules, icon: "BookCheck" },
       { label: "Contradictions", href: ROUTES.contradictions, icon: "AlertTriangle" },
+      { label: "Orchestrator", href: ROUTES.orchestrator, icon: "Workflow" },
       { label: "Simulation", href: ROUTES.simulation, icon: "FlaskConical" },
     ],
   },

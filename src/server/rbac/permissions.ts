@@ -9,6 +9,7 @@ export const Resources = {
   KNOWLEDGE_GRAPH: "knowledge_graph",
   EVIDENCE: "evidence",
   CONTRADICTIONS: "contradictions",
+  ORCHESTRATOR: "orchestrator",
 } as const;
 
 export const Actions = {
@@ -79,6 +80,11 @@ export const Permissions = {
     update: "contradictions:update",
     manage: "contradictions:manage",
   },
+  orchestrator: {
+    read: "orchestrator:read",
+    execute: "orchestrator:execute",
+    manage: "orchestrator:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -116,7 +122,10 @@ export type PermissionString =
   | "evidence:execute"
   | "contradictions:read"
   | "contradictions:update"
-  | "contradictions:manage";
+  | "contradictions:manage"
+  | "orchestrator:read"
+  | "orchestrator:execute"
+  | "orchestrator:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -154,6 +163,9 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.contradictions.read,
   Permissions.contradictions.update,
   Permissions.contradictions.manage,
+  Permissions.orchestrator.read,
+  Permissions.orchestrator.execute,
+  Permissions.orchestrator.manage,
 ];
 
 export interface RoleDefinition {
@@ -208,6 +220,9 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.read,
       Permissions.contradictions.update,
       Permissions.contradictions.manage,
+      Permissions.orchestrator.read,
+      Permissions.orchestrator.execute,
+      Permissions.orchestrator.manage,
     ],
   },
   {
@@ -226,6 +241,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.knowledgeGraph.read,
       Permissions.evidence.read,
       Permissions.contradictions.read,
+      Permissions.orchestrator.read,
     ],
   },
   {
@@ -254,6 +270,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.evidence.execute,
       Permissions.contradictions.read,
       Permissions.contradictions.update,
+      Permissions.orchestrator.read,
+      Permissions.orchestrator.execute,
     ],
   },
   {
@@ -271,6 +289,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.knowledgeGraph.read,
       Permissions.evidence.read,
       Permissions.contradictions.read,
+      Permissions.orchestrator.read,
     ],
   },
 ];

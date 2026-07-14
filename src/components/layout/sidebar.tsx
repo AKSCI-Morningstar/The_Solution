@@ -30,6 +30,7 @@ import {
   Layers,
   Cog,
   ChevronRight,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +53,7 @@ const iconMap: Record<string, LucideIcon> = {
   Settings,
   Layers,
   Cog,
+  Workflow,
 };
 
 function isItemActive(pathname: string, href: string): boolean {

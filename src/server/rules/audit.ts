@@ -1,20 +1,11 @@
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/server/db";
+import { recordAuditEvent } from "@/server/audit";
 
-/** Shared by rule-service.ts and engine/orchestrator.ts so every Rule Engine mutation writes one consistent, org-scoped audit trail. */
+/** Thin, Rule-Engine-specific wrapper over the shared audit writer - keeps call sites in rule-service.ts and engine/orchestrator.ts unchanged. */
 export async function recordRuleAudit(
   organizationId: string,
   action: string,
   ruleId: string,
   metadata: Record<string, unknown>,
 ): Promise<void> {
-  await prisma.auditLog.create({
-    data: {
-      organizationId,
-      action,
-      entity: "Rule",
-      entityId: ruleId,
-      metadata: metadata as Prisma.InputJsonValue,
-    },
-  });
+  await recordAuditEvent(organizationId, action, "Rule", ruleId, metadata);
 }
