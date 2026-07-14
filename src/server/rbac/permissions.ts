@@ -3,6 +3,7 @@ export const Resources = {
   MEMBERS: "members",
   ROLES: "roles",
   SETTINGS: "settings",
+  RULES: "rules",
 } as const;
 
 export const Actions = {
@@ -14,6 +15,7 @@ export const Actions = {
   INVITE: "invite",
   REMOVE: "remove",
   ASSIGN: "assign",
+  EXECUTE: "execute",
 } as const;
 
 export const Permissions = {
@@ -37,6 +39,14 @@ export const Permissions = {
     read: "settings:read",
     update: "settings:update",
   },
+  rules: {
+    read: "rules:read",
+    create: "rules:create",
+    update: "rules:update",
+    delete: "rules:delete",
+    execute: "rules:execute",
+    manage: "rules:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -51,7 +61,13 @@ export type PermissionString =
   | "roles:assign"
   | "roles:manage"
   | "settings:read"
-  | "settings:update";
+  | "settings:update"
+  | "rules:read"
+  | "rules:create"
+  | "rules:update"
+  | "rules:delete"
+  | "rules:execute"
+  | "rules:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -66,6 +82,12 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.roles.manage,
   Permissions.settings.read,
   Permissions.settings.update,
+  Permissions.rules.read,
+  Permissions.rules.create,
+  Permissions.rules.update,
+  Permissions.rules.delete,
+  Permissions.rules.execute,
+  Permissions.rules.manage,
 ];
 
 export interface RoleDefinition {
@@ -97,6 +119,12 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.roles.assign,
       Permissions.settings.read,
       Permissions.settings.update,
+      Permissions.rules.read,
+      Permissions.rules.create,
+      Permissions.rules.update,
+      Permissions.rules.delete,
+      Permissions.rules.execute,
+      Permissions.rules.manage,
     ],
   },
   {
@@ -109,6 +137,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.members.invite,
       Permissions.roles.read,
       Permissions.settings.read,
+      Permissions.rules.read,
     ],
   },
   {
@@ -121,6 +150,10 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.roles.read,
       Permissions.settings.read,
       Permissions.settings.update,
+      Permissions.rules.read,
+      Permissions.rules.create,
+      Permissions.rules.update,
+      Permissions.rules.execute,
     ],
   },
   {
@@ -132,6 +165,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.members.read,
       Permissions.roles.read,
       Permissions.settings.read,
+      Permissions.rules.read,
     ],
   },
 ];

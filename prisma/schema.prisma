@@ -34,6 +34,13 @@ model User {
   uploadedDocuments       IngestionDocument[]        @relation("DocumentUploadedBy")
   createdDocumentVersions IngestionDocumentVersion[] @relation("DocumentVersionCreatedBy")
   createdIngestionJobs    IngestionJob[]             @relation("IngestionJobCreatedBy")
+  ownedRules              Rule[]                     @relation("RuleOwner")
+  createdRules            Rule[]                     @relation("RuleCreatedBy")
+  updatedRules            Rule[]                     @relation("RuleUpdatedBy")
+  publishedRules          Rule[]                     @relation("RulePublishedBy")
+  createdRuleVersions     RuleVersion[]              @relation("RuleVersionCreatedBy")
+  createdRuleFragments    RuleFragment[]
+  triggeredRuleExecutions RuleExecutionResult[]      @relation("RuleExecutionTriggeredBy")
 
   @@index([email])
   @@index([status])
@@ -68,6 +75,10 @@ model Organization {
   extractedEntities        ExtractedEntity[]
   extractedRelationships   ExtractedRelationship[]
   extractedReferences      ExtractedReference[]
+  rules                    Rule[]
+  ruleFragments            RuleFragment[]
+  ruleDependencies         RuleDependency[]
+  ruleExecutionResults     RuleExecutionResult[]
 
   @@index([slug])
   @@index([ownerId])
@@ -646,4 +657,139 @@ model IngestionValidationIssue {
 
   @@index([jobId])
   @@index([jobId, severity])
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic Engineering Rule Engine
+//
+// Rules evaluate the canonical EngineeringEntity/EngineeringRelationship graph
+// (source of truth) only - never ExtractedEntity/Relationship/Reference
+// directly, since those are unconfirmed ingestion-pipeline staging output.
+// Extraction records are consulted only as supplementary, soft-linked
+// (by organizationId + entityType + identifier, no FK) supporting evidence
+// and conflict detection - never as the subject of a rule itself.
+// ---------------------------------------------------------------------------
+
+model Rule {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  category       String
+  priority       Int       @default(0)
+  severity       String    @default("WARNING")
+  status         String    @default("DRAFT")
+  version        Int       @default(1)
+  tags           Json?
+  labels         Json?
+  ownerId        String?
+  scope          Json
+  conditionRoot  Json
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  publishedAt    DateTime?
+  publishedById  String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?        @relation("RuleOwner", fields: [ownerId], references: [id])
+  createdBy    User?        @relation("RuleCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?        @relation("RuleUpdatedBy", fields: [updatedById], references: [id])
+  publishedBy  User?        @relation("RulePublishedBy", fields: [publishedById], references: [id])
+
+  versions         RuleVersion[]
+  dependsOn        RuleDependency[]      @relation("DependentRule")
+  dependents       RuleDependency[]      @relation("DependencyRule")
+  executionResults RuleExecutionResult[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+  @@index([ownerId])
+  @@index([deletedAt])
+}
+
+model RuleVersion {
+  id                String   @id @default(cuid())
+  ruleId            String
+  version           Int
+  snapshot          Json
+  changeDescription String?
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  rule      Rule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("RuleVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([ruleId, version])
+  @@index([ruleId])
+  @@index([createdById])
+}
+
+model RuleFragment {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  condition      Json
+  version        Int      @default(1)
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation(fields: [createdById], references: [id])
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model RuleDependency {
+  id              String   @id @default(cuid())
+  ruleId          String
+  dependsOnRuleId String
+  organizationId  String
+  createdAt       DateTime @default(now())
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rule          Rule         @relation("DependentRule", fields: [ruleId], references: [id], onDelete: Cascade)
+  dependsOnRule Rule         @relation("DependencyRule", fields: [dependsOnRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, dependsOnRuleId])
+  @@index([organizationId])
+  @@index([ruleId])
+  @@index([dependsOnRuleId])
+}
+
+model RuleExecutionResult {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  ruleId                 String
+  ruleVersion            Int
+  subjectEntityId        String
+  batchId                String?
+  outcome                String
+  trace                  Json
+  supportingEntityIds    Json?
+  supportingDocumentRefs Json?
+  missingEvidence        Json?
+  conflictingEvidence    Json?
+  executionTimeMs        Int
+  evaluatedAt            DateTime @default(now())
+  triggeredById          String?
+  createdAt              DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rule         Rule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  triggeredBy  User?        @relation("RuleExecutionTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([organizationId])
+  @@index([ruleId])
+  @@index([organizationId, ruleId, subjectEntityId])
+  @@index([subjectEntityId])
+  @@index([batchId])
+  @@index([outcome])
 }
