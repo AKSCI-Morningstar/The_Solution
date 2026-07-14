@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
+  UploadCloud,
   GitBranch,
   ShieldCheck,
   Tags,
@@ -26,6 +27,7 @@ import {
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
   FileText,
+  UploadCloud,
   GitBranch,
   ShieldCheck,
   Tags,

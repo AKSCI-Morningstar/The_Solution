@@ -15,6 +15,7 @@ export const ROUTES = {
   suppliers: "/suppliers",
   ai: "/ai",
   notifications: "/notifications",
+  ingestion: "/ingestion",
 } as const;
 
 export interface SidebarNavItem {
@@ -27,6 +28,7 @@ export interface SidebarNavItem {
 export const SIDEBAR_NAV: SidebarNavItem[] = [
   { label: "Dashboard", href: ROUTES.dashboard, icon: "LayoutDashboard" },
   { label: "Documents", href: ROUTES.documents, icon: "FileText" },
+  { label: "Ingestion", href: ROUTES.ingestion, icon: "UploadCloud" },
   { label: "Knowledge Graph", href: ROUTES["knowledge-graph"], icon: "GitBranch" },
   { label: "Evidence", href: ROUTES.evidence, icon: "ShieldCheck" },
   { label: "Entities", href: ROUTES.entities, icon: "Tags" },

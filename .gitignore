@@ -53,6 +53,9 @@ next-env.d.ts
 # prisma
 prisma/migrations/
 
+# ingestion pipeline local file storage
+/.data/
+
 # IDE
 .idea
 *.swp

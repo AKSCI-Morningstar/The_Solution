@@ -8,29 +8,32 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
+  id              String    @id @default(cuid())
+  email           String    @unique
   name            String?
   passwordHash    String
-  isEmailVerified Boolean  @default(false)
-  status          String   @default("active")
+  isEmailVerified Boolean   @default(false)
+  status          String    @default("active")
   lastLoginAt     DateTime?
   metadata        Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  sessions            Session[]
-  verificationTokens  VerificationToken[]
-  ownedOrganizations  Organization[]      @relation("OrganizationOwner")
-  memberships         OrganizationMember[]
-  sentInvitations     Invitation[]        @relation("InvitationSender")
-  authEvents          AuthEvent[]
-  createdEntities     EngineeringEntity[]    @relation("EntityCreatedBy")
-  updatedEntities     EngineeringEntity[]    @relation("EntityUpdatedBy")
-  createdRelationships EngineeringRelationship[]
-  createdVersions     EntityVersion[]
-  createdAuditLogs    EntityAuditLog[]
+  sessions                Session[]
+  verificationTokens      VerificationToken[]
+  ownedOrganizations      Organization[]             @relation("OrganizationOwner")
+  memberships             OrganizationMember[]
+  sentInvitations         Invitation[]               @relation("InvitationSender")
+  authEvents              AuthEvent[]
+  createdEntities         EngineeringEntity[]        @relation("EntityCreatedBy")
+  updatedEntities         EngineeringEntity[]        @relation("EntityUpdatedBy")
+  createdRelationships    EngineeringRelationship[]
+  createdVersions         EntityVersion[]
+  createdAuditLogs        EntityAuditLog[]
+  uploadedDocuments       IngestionDocument[]        @relation("DocumentUploadedBy")
+  createdDocumentVersions IngestionDocumentVersion[] @relation("DocumentVersionCreatedBy")
+  createdIngestionJobs    IngestionJob[]             @relation("IngestionJobCreatedBy")
 
   @@index([email])
   @@index([status])
@@ -38,28 +41,33 @@ model User {
 }
 
 model Organization {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
-  slug        String   @unique
+  slug        String    @unique
   description String?
   logo        String?
   metadata    Json?
   settings    Json?
-  status      String   @default("active")
+  status      String    @default("active")
   ownerId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  owner     User                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  members   OrganizationMember[]
-  invitations Invitation[]
-  engineeringEntities   EngineeringEntity[]
+  owner                    User                      @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  members                  OrganizationMember[]
+  invitations              Invitation[]
+  engineeringEntities      EngineeringEntity[]
   engineeringRelationships EngineeringRelationship[]
-  graphNodeIndices     GraphNodeIndex[]
-  graphEdgeIndices     GraphEdgeIndex[]
-  graphLayouts         GraphLayout[]
-  graphSnapshots       GraphSnapshot[]
+  graphNodeIndices         GraphNodeIndex[]
+  graphEdgeIndices         GraphEdgeIndex[]
+  graphLayouts             GraphLayout[]
+  graphSnapshots           GraphSnapshot[]
+  ingestionDocuments       IngestionDocument[]
+  ingestionJobs            IngestionJob[]
+  extractedEntities        ExtractedEntity[]
+  extractedRelationships   ExtractedRelationship[]
+  extractedReferences      ExtractedReference[]
 
   @@index([slug])
   @@index([ownerId])
@@ -68,15 +76,15 @@ model Organization {
 }
 
 model OrganizationMember {
-  id              String    @id @default(cuid())
-  organizationId  String
-  userId          String
-  role            String    @default("member")
-  status          String    @default("active")
-  invitedBy       String?
-  joinedAt        DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String    @default("member")
+  status         String    @default("active")
+  invitedBy      String?
+  joinedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -129,19 +137,19 @@ model RolePermission {
 }
 
 model Invitation {
-  id              String    @id @default(cuid())
-  organizationId  String
-  email           String?
-  userId          String?
-  token           String    @unique
-  role            String    @default("member")
-  status          String    @default("pending")
-  invitedBy       String
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  declinedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String?
+  userId         String?
+  token          String    @unique
+  role           String    @default("member")
+  status         String    @default("pending")
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  declinedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   inviter      User         @relation("InvitationSender", fields: [invitedBy], references: [id])
@@ -154,15 +162,15 @@ model Invitation {
 }
 
 model Session {
-  id         String   @id @default(cuid())
-  token      String   @unique
-  userId     String
-  userAgent  String?
-  ipAddress  String?
-  expiresAt  DateTime
-  isRevoked  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -172,13 +180,13 @@ model Session {
 }
 
 model VerificationToken {
-  id         String   @id @default(cuid())
-  token      String   @unique
-  userId     String
-  type       String
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  type      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -203,26 +211,26 @@ model AuthEvent {
 }
 
 model EngineeringEntity {
-  id              String   @id @default(cuid())
-  organizationId  String
-  entityType      String
-  identifier      String
-  name            String
-  description     String?
-  version         String   @default("1.0.0")
-  status          String   @default("DRAFT")
-  tags            Json?
-  labels          Json?
-  metadata        Json?
-  createdById     String?
-  updatedById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  deletedAt       DateTime?
+  id             String    @id @default(cuid())
+  organizationId String
+  entityType     String
+  identifier     String
+  name           String
+  description    String?
+  version        String    @default("1.0.0")
+  status         String    @default("DRAFT")
+  tags           Json?
+  labels         Json?
+  metadata       Json?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User?               @relation("EntityCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User?               @relation("EntityUpdatedBy", fields: [updatedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("EntityCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?        @relation("EntityUpdatedBy", fields: [updatedById], references: [id])
 
   sourceRelationships EngineeringRelationship[] @relation("SourceEntity")
   targetRelationships EngineeringRelationship[] @relation("TargetEntity")
@@ -246,7 +254,7 @@ model EngineeringRelationship {
   createdById      String?
   createdAt        DateTime @default(now())
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sourceEntity EngineeringEntity @relation("SourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
   targetEntity EngineeringEntity @relation("TargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
   createdBy    User?             @relation(fields: [createdById], references: [id])
@@ -292,20 +300,20 @@ model EntityAuditLog {
 }
 
 model GraphNodeIndex {
-  id              String   @id @default(cuid())
-  organizationId  String
-  entityId        String   @unique
-  entityType      String
-  identifier      String
-  label           String
-  status          String
-  metadata        Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  entityId       String   @unique
+  entityType     String
+  identifier     String
+  label          String
+  status         String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  outgoing     GraphEdgeIndex[]  @relation("EdgeSource")
-  incoming     GraphEdgeIndex[]  @relation("EdgeTarget")
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  outgoing     GraphEdgeIndex[] @relation("EdgeSource")
+  incoming     GraphEdgeIndex[] @relation("EdgeTarget")
 
   @@index([organizationId])
   @@index([organizationId, entityType])
@@ -335,14 +343,14 @@ model GraphEdgeIndex {
 }
 
 model GraphLayout {
-  id              String   @id @default(cuid())
-  organizationId  String
-  name            String
-  description     String?
-  metadata        Json?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   nodes        GraphLayoutNode[]
 
   @@index([organizationId])
@@ -364,12 +372,12 @@ model GraphLayoutNode {
 }
 
 model GraphSnapshot {
-  id              String   @id @default(cuid())
-  organizationId  String
-  name            String
-  description     String?
-  metadata        Json?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -400,4 +408,242 @@ model Timestamp {
 
   @@index([label])
   @@index([value])
+}
+
+// ---------------------------------------------------------------------------
+// Engineering Ingestion Pipeline
+//
+// Converts uploaded engineering documents into structured, provenanced
+// "extraction" records. This layer does NOT determine engineering truth:
+// ExtractedEntity/ExtractedRelationship/ExtractedReference are a staging
+// area (status PENDING/CONFIRMED/REJECTED) distinct from the canonical
+// EngineeringEntity/EngineeringRelationship graph above. Promotion from
+// extraction to canonical truth is a future milestone (see linkedEntityId).
+// ---------------------------------------------------------------------------
+
+model IngestionDocument {
+  id             String    @id @default(cuid())
+  organizationId String
+  fileName       String
+  mimeType       String
+  fileExtension  String
+  sizeBytes      Int
+  checksum       String
+  storageKey     String
+  status         String    @default("UPLOADED")
+  currentVersion Int       @default(1)
+  uploadedById   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy   User?        @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+
+  versions               IngestionDocumentVersion[]
+  jobs                   IngestionJob[]
+  extractedEntities      ExtractedEntity[]
+  extractedRelationships ExtractedRelationship[]
+  extractedReferences    ExtractedReference[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([uploadedById])
+  @@index([checksum])
+  @@index([deletedAt])
+}
+
+model IngestionDocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  version     Int
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  checksum    String
+  storageKey  String
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  document  IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("DocumentVersionCreatedBy", fields: [createdById], references: [id])
+
+  jobs              IngestionJob[]
+  extractedEntities ExtractedEntity[]
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@index([createdById])
+}
+
+model IngestionJob {
+  id                String    @id @default(cuid())
+  organizationId    String
+  documentId        String
+  documentVersionId String
+  status            String    @default("QUEUED")
+  currentStage      String?
+  stageIndex        Int       @default(0)
+  totalStages       Int       @default(13)
+  progressPercent   Int       @default(0)
+  attempt           Int       @default(1)
+  maxAttempts       Int       @default(3)
+  priority          Int       @default(0)
+  scheduledAt       DateTime  @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelRequested   Boolean   @default(false)
+  parserName        String?
+  parserVersion     String?
+  documentType      String?
+  graphPreview      Json?
+  errorStage        String?
+  errorMessage      String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document        IngestionDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentVersion IngestionDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  createdBy       User?                    @relation("IngestionJobCreatedBy", fields: [createdById], references: [id])
+
+  stageLogs              IngestionStageLog[]
+  extractedEntities      ExtractedEntity[]
+  extractedRelationships ExtractedRelationship[]
+  extractedReferences    ExtractedReference[]
+  validationIssues       IngestionValidationIssue[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([documentId])
+  @@index([documentVersionId])
+  @@index([createdById])
+  @@index([scheduledAt])
+  @@index([status, scheduledAt])
+}
+
+model IngestionStageLog {
+  id           String    @id @default(cuid())
+  jobId        String
+  stageName    String
+  stageIndex   Int
+  status       String
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  errorMessage String?
+  metadata     Json?
+
+  job IngestionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([jobId, stageIndex])
+}
+
+model ExtractedEntity {
+  id                String   @id @default(cuid())
+  organizationId    String
+  jobId             String
+  documentId        String
+  documentVersionId String
+  entityType        String
+  identifier        String?
+  name              String
+  rawText           String
+  attributes        Json?
+  confidence        Float
+  status            String   @default("PENDING")
+  page              Int?
+  section           String?
+  paragraph         Int?
+  extractionMethod  String
+  parserVersion     String
+  extractedAt       DateTime @default(now())
+  linkedEntityId    String?
+
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job             IngestionJob             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  document        IngestionDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentVersion IngestionDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  sourceRelationships ExtractedRelationship[] @relation("ExtractedRelSource")
+  targetRelationships ExtractedRelationship[] @relation("ExtractedRelTarget")
+
+  @@index([organizationId])
+  @@index([jobId])
+  @@index([documentId])
+  @@index([organizationId, entityType])
+  @@index([organizationId, status])
+}
+
+model ExtractedRelationship {
+  id                      String   @id @default(cuid())
+  organizationId          String
+  jobId                   String
+  documentId              String
+  relationshipType        String
+  sourceExtractedEntityId String
+  targetExtractedEntityId String
+  confidence              Float
+  page                    Int?
+  section                 String?
+  extractionMethod        String
+  parserVersion           String
+  extractedAt             DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          IngestionJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  document     IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sourceEntity ExtractedEntity   @relation("ExtractedRelSource", fields: [sourceExtractedEntityId], references: [id], onDelete: Cascade)
+  targetEntity ExtractedEntity   @relation("ExtractedRelTarget", fields: [targetExtractedEntityId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([jobId])
+  @@index([documentId])
+  @@index([sourceExtractedEntityId])
+  @@index([targetExtractedEntityId])
+}
+
+model ExtractedReference {
+  id               String   @id @default(cuid())
+  organizationId   String
+  jobId            String
+  documentId       String
+  referenceType    String
+  rawText          String
+  targetIdentifier String
+  resolved         Boolean  @default(false)
+  resolvedEntityId String?
+  page             Int?
+  section          String?
+  confidence       Float
+  extractionMethod String
+  parserVersion    String
+  extractedAt      DateTime @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          IngestionJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  document     IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([jobId])
+  @@index([documentId])
+  @@index([organizationId, referenceType])
+}
+
+model IngestionValidationIssue {
+  id        String   @id @default(cuid())
+  jobId     String
+  severity  String
+  code      String
+  message   String
+  stage     String
+  context   Json?
+  createdAt DateTime @default(now())
+
+  job IngestionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([jobId, severity])
 }
