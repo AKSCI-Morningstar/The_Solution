@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getGraphEdges } from "@/server/knowledge-graph";
+import { edgesQuerySchema } from "@/server/knowledge-graph/validation";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { AppError } from "@/shared/errors";
 
@@ -7,18 +8,14 @@ export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
     const url = new URL(request.url);
-    const relationshipType = url.searchParams.get("relationshipType") ?? undefined;
-    const sourceNodeId = url.searchParams.get("sourceNodeId") ?? undefined;
-    const targetNodeId = url.searchParams.get("targetNodeId") ?? undefined;
-    const page = Number(url.searchParams.get("page")) || 1;
-    const pageSize = Number(url.searchParams.get("pageSize")) || 50;
-    const edges = await getGraphEdges(orgId, {
-      relationshipType,
-      sourceNodeId,
-      targetNodeId,
-      page,
-      pageSize,
-    });
+    const parsed = edgesQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+    const edges = await getGraphEdges(orgId, parsed.data);
     return NextResponse.json(edges);
   } catch (error) {
     if (error instanceof AppError) {

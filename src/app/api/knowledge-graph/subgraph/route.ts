@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSubgraph } from "@/server/knowledge-graph";
+import { subgraphQuerySchema, expandSubgraphSchema } from "@/server/knowledge-graph/validation";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { AppError } from "@/shared/errors";
 
@@ -7,9 +8,14 @@ export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
     const url = new URL(request.url);
-    const entityType = url.searchParams.get("entityType") ?? undefined;
-    const limit = Number(url.searchParams.get("limit")) || 100;
-    const result = await getSubgraph(orgId, { entityType, limit });
+    const parsed = subgraphQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+    const result = await getSubgraph(orgId, parsed.data);
     return NextResponse.json({ data: result });
   } catch (error) {
     if (error instanceof AppError) {
@@ -26,12 +32,15 @@ export async function POST(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
     const body = await request.json();
-    const { nodeIds, depth = 1 } = body;
-    if (!nodeIds || !Array.isArray(nodeIds)) {
-      return NextResponse.json({ error: "nodeIds array is required" }, { status: 400 });
+    const parsed = expandSubgraphSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
     const { expandSubgraph } = await import("@/server/knowledge-graph");
-    const result = await expandSubgraph(nodeIds, orgId, depth);
+    const result = await expandSubgraph(parsed.data.nodeIds, orgId, parsed.data.depth);
     return NextResponse.json({ data: result });
   } catch (error) {
     if (error instanceof AppError) {

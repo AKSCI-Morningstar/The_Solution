@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getGraphStats, getGraphNodes } from "@/server/knowledge-graph";
+import { nodesQuerySchema } from "@/server/knowledge-graph/validation";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { AppError } from "@/shared/errors";
 
@@ -7,13 +8,16 @@ export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
     const url = new URL(request.url);
-    const entityType = url.searchParams.get("entityType") ?? undefined;
-    const search = url.searchParams.get("search") ?? undefined;
-    const page = Number(url.searchParams.get("page")) || 1;
-    const pageSize = Number(url.searchParams.get("pageSize")) || 50;
+    const parsed = nodesQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
     const [stats, nodes] = await Promise.all([
       getGraphStats(orgId),
-      getGraphNodes(orgId, { entityType, search, page, pageSize }),
+      getGraphNodes(orgId, parsed.data),
     ]);
     return NextResponse.json({ ...nodes, stats });
   } catch (error) {

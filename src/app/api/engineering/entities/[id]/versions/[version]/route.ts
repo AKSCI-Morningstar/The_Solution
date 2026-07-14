@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVersion, restoreVersion } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(
@@ -29,8 +30,15 @@ export async function POST(
 ) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
     const { id, version } = await params;
-    const ver = await restoreVersion(id, version, orgId, "");
+    const ver = await restoreVersion(id, version, orgId, user.id);
     return NextResponse.json({ data: ver });
   } catch (error) {
     if (error instanceof AppError) {

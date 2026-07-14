@@ -19,7 +19,7 @@ export async function PATCH(
       );
     }
 
-    await changeMemberRole(id, userId, role, "");
+    await changeMemberRole(id, userId, role);
     return NextResponse.json({ data: { message: "Role updated" } });
   } catch (error) {
     if (error instanceof ForbiddenError) {

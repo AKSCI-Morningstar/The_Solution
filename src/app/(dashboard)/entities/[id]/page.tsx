@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { EntityDetail } from "@/features/engineering/components/entity-detail";
+import { EntityDetail, type Entity } from "@/features/engineering/components/entity-detail";
 import { EntityEditor } from "@/features/engineering/components/entity-editor";
 import { RelationshipOverview } from "@/features/engineering/components/relationship-overview";
 
@@ -11,6 +11,7 @@ export default function EntityDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [tab, setTab] = useState("details");
 
   async function handleDelete() {
@@ -23,21 +24,22 @@ export default function EntityDetailPage() {
     }
   }
 
-  if (editing) {
+  if (editing && editingEntity) {
     return (
       <div className="flex flex-1 flex-col gap-6 p-8">
         <h1 className="text-foreground text-2xl font-bold">Edit Entity</h1>
         <EntityEditor
           initialData={{
-            id: params.id,
-            identifier: "",
-            name: "",
-            description: null,
-            entityType: "",
-            status: "DRAFT",
+            id: editingEntity.id,
+            identifier: editingEntity.identifier,
+            name: editingEntity.name,
+            description: editingEntity.description,
+            entityType: editingEntity.entityType,
+            status: editingEntity.status,
           }}
           onSuccess={() => {
             setEditing(false);
+            setEditingEntity(null);
             router.refresh();
           }}
         />
@@ -66,7 +68,10 @@ export default function EntityDetailPage() {
         <TabsContent value="details" className="mt-6">
           <EntityDetail
             entityId={params.id}
-            onEdit={() => setEditing(true)}
+            onEdit={(entity) => {
+              setEditingEntity(entity);
+              setEditing(true);
+            }}
             onDelete={handleDelete}
           />
         </TabsContent>

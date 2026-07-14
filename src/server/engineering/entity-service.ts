@@ -79,7 +79,9 @@ export async function getEntity(entityId: string, organizationId: string) {
 }
 
 export async function listEntities(organizationId: string, filters: Record<string, string>) {
-  const { entityType, status, search, page, pageSize } = entityFilterSchema.parse(filters);
+  const parsed = entityFilterSchema.safeParse(filters);
+  if (!parsed.success) throw new ValidationError(parsed.error.flatten().fieldErrors);
+  const { entityType, status, search, page, pageSize } = parsed.data;
   const where: Record<string, unknown> = { organizationId, deletedAt: null };
 
   if (entityType) where.entityType = entityType;
@@ -150,6 +152,14 @@ export async function deleteEntity(entityId: string, organizationId: string, use
     where: { id: entityId },
     data: { deletedAt: new Date(), updatedById: userId },
   });
+
+  const node = await prisma.graphNodeIndex.findUnique({ where: { entityId } });
+  if (node) {
+    await prisma.graphEdgeIndex.deleteMany({
+      where: { OR: [{ sourceNodeId: node.id }, { targetNodeId: node.id }] },
+    });
+    await prisma.graphNodeIndex.delete({ where: { id: node.id } });
+  }
 
   await recordAudit(entity.id, "ENTITY_DELETED", {}, userId);
   logger.info("Engineering entity deleted", { entityId, type: entity.entityType });

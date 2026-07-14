@@ -19,6 +19,7 @@ interface Org {
 export function OrganizationSelector() {
   const router = useRouter();
   const [orgs, setOrgs] = useState<Org[]>([]);
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,8 +28,11 @@ export function OrganizationSelector() {
       try {
         const res = await fetch("/api/organizations");
         if (res.ok) {
-          const { data } = await res.json();
-          if (!cancelled) setOrgs(data);
+          const { data, activeOrganizationId } = await res.json();
+          if (!cancelled) {
+            setOrgs(data);
+            setActiveOrgId(activeOrganizationId ?? null);
+          }
         }
       } catch {
         // silently fail
@@ -96,7 +100,7 @@ export function OrganizationSelector() {
     );
   }
 
-  const activeOrg = orgs[0];
+  const activeOrg = orgs.find((org) => org.id === activeOrgId) ?? orgs[0];
 
   return (
     <DropdownMenu

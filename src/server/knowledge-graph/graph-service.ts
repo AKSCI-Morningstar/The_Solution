@@ -1,6 +1,6 @@
 import { prisma } from "@/server/db";
 import { Prisma, type GraphNodeIndex, type GraphEdgeIndex } from "@prisma/client";
-import { NotFoundError } from "@/shared/errors";
+import { NotFoundError, ValidationError } from "@/shared/errors";
 import { logger } from "@/shared/logging";
 
 type NodeRef = Pick<GraphNodeIndex, "id" | "entityId" | "label" | "entityType">;
@@ -64,8 +64,43 @@ export async function syncGraphIndexes(organizationId: string) {
     });
   }
 
+  const liveEntityIds = new Set(entities.map((e) => e.id));
+  const liveRelationshipIds = new Set(relationships.map((r) => r.id));
+
+  const [staleNodes, staleEdges] = await Promise.all([
+    prisma.graphNodeIndex.findMany({
+      where: { organizationId },
+      select: { id: true, entityId: true },
+    }),
+    prisma.graphEdgeIndex.findMany({
+      where: { organizationId },
+      select: { id: true, relationshipId: true },
+    }),
+  ]);
+  const orphanedNodeIds = staleNodes.filter((n) => !liveEntityIds.has(n.entityId)).map((n) => n.id);
+  const orphanedEdgeIds = staleEdges
+    .filter((e) => !liveRelationshipIds.has(e.relationshipId))
+    .map((e) => e.id);
+
+  if (orphanedEdgeIds.length > 0) {
+    await prisma.graphEdgeIndex.deleteMany({ where: { id: { in: orphanedEdgeIds } } });
+  }
+  if (orphanedNodeIds.length > 0) {
+    await prisma.graphEdgeIndex.deleteMany({
+      where: {
+        OR: [{ sourceNodeId: { in: orphanedNodeIds } }, { targetNodeId: { in: orphanedNodeIds } }],
+      },
+    });
+    await prisma.graphNodeIndex.deleteMany({ where: { id: { in: orphanedNodeIds } } });
+  }
+
   const stats = { nodes: entities.length, edges: relationships.length };
-  logger.info("Graph indexes synced", { organizationId, ...stats });
+  logger.info("Graph indexes synced", {
+    organizationId,
+    ...stats,
+    prunedNodes: orphanedNodeIds.length,
+    prunedEdges: orphanedEdgeIds.length,
+  });
   return stats;
 }
 
@@ -302,6 +337,18 @@ export async function saveLayout(
   name: string,
   nodePositions: { nodeIndexId: string; x: number; y: number }[],
 ) {
+  const ownedNodes = await prisma.graphNodeIndex.findMany({
+    where: { id: { in: nodePositions.map((np) => np.nodeIndexId) }, organizationId },
+    select: { id: true },
+  });
+  const ownedIds = new Set(ownedNodes.map((n) => n.id));
+  const foreign = nodePositions.filter((np) => !ownedIds.has(np.nodeIndexId));
+  if (foreign.length > 0) {
+    throw new ValidationError({
+      nodePositions: [`${foreign.length} node id(s) do not belong to this organization`],
+    });
+  }
+
   const layout = await prisma.graphLayout.create({
     data: {
       organizationId,

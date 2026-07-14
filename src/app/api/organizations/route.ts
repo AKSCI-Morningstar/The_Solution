@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { listUserOrganizations, createOrganization } from "@/server/organizations";
+import { getActiveOrganizationId } from "@/server/organizations/organization-context";
 import { AppError, ValidationError } from "@/shared/errors";
 
 export async function GET() {
   try {
-    const orgs = await listUserOrganizations();
-    return NextResponse.json({ data: orgs });
+    const [orgs, activeOrganizationId] = await Promise.all([
+      listUserOrganizations(),
+      getActiveOrganizationId(),
+    ]);
+    return NextResponse.json({ data: orgs, activeOrganizationId });
   } catch (error) {
     if (error instanceof AppError) {
       return NextResponse.json(

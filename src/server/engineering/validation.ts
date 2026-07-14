@@ -6,11 +6,9 @@ import {
   LIFECYCLE_TRANSITIONS,
 } from "./constants";
 
-export const entityTypeSchema = z.enum(ENTITY_TYPES as unknown as [string, ...string[]]);
-export const entityStatusSchema = z.enum(ENTITY_STATUSES as unknown as [string, ...string[]]);
-export const relationshipTypeSchema = z.enum(
-  RELATIONSHIP_TYPES as unknown as [string, ...string[]],
-);
+export const entityTypeSchema = z.enum(ENTITY_TYPES);
+export const entityStatusSchema = z.enum(ENTITY_STATUSES);
+export const relationshipTypeSchema = z.enum(RELATIONSHIP_TYPES);
 
 export const identifierSchema = z
   .string()

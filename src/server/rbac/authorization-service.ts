@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db";
+import { validateSession } from "@/server/auth/session-service";
 import { ForbiddenError, NotFoundError } from "@/shared/errors";
 import { type PermissionString, DEFAULT_ROLES } from "./permissions";
 
@@ -65,6 +66,21 @@ export async function requirePermission(
 }
 
 export async function getOrganizationRoles(organizationId: string): Promise<RoleInfo[]> {
+  const session = await validateSession();
+  if (!session) throw new ForbiddenError("Not authenticated");
+
+  const membership = await prisma.organizationMember.findUnique({
+    where: {
+      organizationId_userId: {
+        organizationId,
+        userId: session.userId,
+      },
+    },
+  });
+  if (!membership || membership.status !== "active") {
+    throw new NotFoundError("Organization", organizationId);
+  }
+
   const dbRoles = await prisma.role.findMany({
     where: { organizationId },
     include: {
@@ -100,8 +116,11 @@ export async function changeMemberRole(
   organizationId: string,
   targetUserId: string,
   newRole: string,
-  actorUserId: string,
 ): Promise<void> {
+  const session = await validateSession();
+  if (!session) throw new ForbiddenError("Not authenticated");
+  const actorUserId = session.userId;
+
   const actorMembership = await prisma.organizationMember.findUnique({
     where: {
       organizationId_userId: {

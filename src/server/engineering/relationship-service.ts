@@ -78,8 +78,9 @@ export async function createRelationship(
 }
 
 export async function listRelationships(organizationId: string, filters: Record<string, string>) {
-  const { sourceEntityId, targetEntityId, relationshipType, page, pageSize } =
-    relationshipFilterSchema.parse(filters);
+  const parsed = relationshipFilterSchema.safeParse(filters);
+  if (!parsed.success) throw new ValidationError(parsed.error.flatten().fieldErrors);
+  const { sourceEntityId, targetEntityId, relationshipType, page, pageSize } = parsed.data;
   const where: Record<string, unknown> = { organizationId };
 
   if (sourceEntityId) where.sourceEntityId = sourceEntityId;
@@ -116,6 +117,7 @@ export async function deleteRelationship(
   if (!relationship) throw new NotFoundError("EngineeringRelationship", relationshipId);
 
   await prisma.engineeringRelationship.delete({ where: { id: relationshipId } });
+  await prisma.graphEdgeIndex.deleteMany({ where: { relationshipId } });
 
   await recordAudit(
     relationship.sourceEntityId,

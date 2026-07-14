@@ -10,7 +10,7 @@ import { StatusBadge } from "./status-badge";
 import { EntityDetailSkeleton } from "./loading-state";
 import { ErrorState } from "./error-state";
 
-interface Entity {
+export interface Entity {
   id: string;
   identifier: string;
   name: string;
@@ -29,7 +29,7 @@ interface Entity {
 
 interface EntityDetailProps {
   entityId: string;
-  onEdit?: () => void;
+  onEdit?: (entity: Entity) => void;
   onDelete?: () => void;
 }
 
@@ -93,7 +93,7 @@ export function EntityDetail({ entityId, onEdit, onDelete }: EntityDetailProps) 
         </div>
         <div className="flex items-center gap-2">
           {onEdit && (
-            <Button variant="secondary" size="sm" onClick={onEdit}>
+            <Button variant="secondary" size="sm" onClick={() => onEdit(entity)}>
               <Edit3 className="mr-1.5 size-4" />
               Edit
             </Button>
