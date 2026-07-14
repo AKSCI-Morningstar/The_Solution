@@ -10,6 +10,7 @@ export const Resources = {
   EVIDENCE: "evidence",
   CONTRADICTIONS: "contradictions",
   ORCHESTRATOR: "orchestrator",
+  REALITY: "reality",
 } as const;
 
 export const Actions = {
@@ -85,6 +86,11 @@ export const Permissions = {
     execute: "orchestrator:execute",
     manage: "orchestrator:manage",
   },
+  reality: {
+    read: "reality:read",
+    execute: "reality:execute",
+    manage: "reality:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -125,7 +131,10 @@ export type PermissionString =
   | "contradictions:manage"
   | "orchestrator:read"
   | "orchestrator:execute"
-  | "orchestrator:manage";
+  | "orchestrator:manage"
+  | "reality:read"
+  | "reality:execute"
+  | "reality:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -166,6 +175,9 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.orchestrator.read,
   Permissions.orchestrator.execute,
   Permissions.orchestrator.manage,
+  Permissions.reality.read,
+  Permissions.reality.execute,
+  Permissions.reality.manage,
 ];
 
 export interface RoleDefinition {
@@ -223,6 +235,9 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.orchestrator.read,
       Permissions.orchestrator.execute,
       Permissions.orchestrator.manage,
+      Permissions.reality.read,
+      Permissions.reality.execute,
+      Permissions.reality.manage,
     ],
   },
   {
@@ -242,6 +257,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.evidence.read,
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
+      Permissions.reality.read,
     ],
   },
   {
@@ -272,6 +288,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.update,
       Permissions.orchestrator.read,
       Permissions.orchestrator.execute,
+      Permissions.reality.read,
+      Permissions.reality.execute,
     ],
   },
   {
@@ -290,6 +308,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.evidence.read,
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
+      Permissions.reality.read,
     ],
   },
 ];

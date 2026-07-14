@@ -45,6 +45,7 @@ model User {
   resolvedContradictions  Contradiction[]             @relation("ContradictionResolvedBy")
   contradictionLogActions ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
   triggeredOrchestrations OrchestrationRun[]          @relation("OrchestrationTriggeredBy")
+  triggeredRealityAssessments RealityAssessment[]     @relation("RealityAssessmentTriggeredBy")
   notifications           Notification[]
 
   @@index([email])
@@ -86,6 +87,7 @@ model Organization {
   ruleExecutionResults     RuleExecutionResult[]
   contradictions           Contradiction[]
   orchestrationRuns        OrchestrationRun[]
+  realityAssessments       RealityAssessment[]
   notifications            Notification[]
 
   @@index([slug])
@@ -890,9 +892,10 @@ model OrchestrationRun {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  triggeredBy  User?                   @relation("OrchestrationTriggeredBy", fields: [triggeredById], references: [id])
-  stageLogs    OrchestrationStageLog[]
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  triggeredBy        User?                   @relation("OrchestrationTriggeredBy", fields: [triggeredById], references: [id])
+  stageLogs          OrchestrationStageLog[]
+  realityAssessments RealityAssessment[]
 
   @@index([organizationId])
   @@index([organizationId, status])
@@ -939,4 +942,78 @@ model Notification {
   @@index([organizationId, userId])
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Engineering Reality Engine
+//
+// Determines Engineering Reality - the current verifiable state of an
+// engineering system - by reinterpreting an already-completed Orchestration
+// Run's outputs (never re-executing the Rule or Contradiction engines) plus
+// two additional, genuinely new deterministic signals: whether any
+// associated contradiction's lifecycle status has changed since the run
+// completed, and whether the Ingestion Pipeline has finished processing the
+// source documents for every entity in scope. The Reality Engine never
+// invents a conclusion - if reality cannot be established, the outcome is
+// exactly "INSUFFICIENT_EVIDENCE".
+// ---------------------------------------------------------------------------
+
+model RealityAssessment {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  subjectEntityId       String
+  orchestrationRunId    String
+  status                String    @default("QUEUED")
+  currentStage          String?
+  stageIndex            Int       @default(0)
+  totalStages           Int       @default(8)
+  cancelRequested       Boolean   @default(false)
+  outcome               String?
+  reasoning             String?
+  entitiesEvaluated     Json      @default("[]")
+  evidenceSummary       Json?
+  ruleSummary           Json?
+  contradictionSummary  Json?
+  traceabilitySummary   Json?
+  ingestionCompleteness Json?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  durationMs            Int?
+  errorStage            String?
+  errorMessage          String?
+  triggeredById         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orchestrationRun OrchestrationRun  @relation(fields: [orchestrationRunId], references: [id], onDelete: Cascade)
+  triggeredBy     User?              @relation("RealityAssessmentTriggeredBy", fields: [triggeredById], references: [id])
+  stageLogs       RealityStageLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, subjectEntityId])
+  @@index([orchestrationRunId])
+  @@index([triggeredById])
+  @@index([createdAt])
+}
+
+model RealityStageLog {
+  id           String    @id @default(cuid())
+  assessmentId String
+  stageName    String
+  stageIndex   Int
+  status       String
+  attempt      Int       @default(1)
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  errorMessage String?
+  output       Json?
+  metadata     Json?
+
+  assessment RealityAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([assessmentId, stageIndex])
 }

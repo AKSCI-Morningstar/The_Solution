@@ -116,6 +116,13 @@ export function RunDetail({ runId }: { runId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <RunStatusBadge status={run.status} />
+          {run.status === "COMPLETED" && (
+            <Link href={`/reality/new?orchestrationRunId=${run.id}`}>
+              <Button variant="secondary" size="sm">
+                Assess reality
+              </Button>
+            </Link>
+          )}
           {canCancel && (
             <Button variant="secondary" size="sm" disabled={isCancelling} onClick={handleCancel}>
               {isCancelling ? "Cancelling..." : "Cancel"}
