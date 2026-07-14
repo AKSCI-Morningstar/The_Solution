@@ -34,6 +34,9 @@ model User {
   uploadedDocuments       IngestionDocument[]        @relation("DocumentUploadedBy")
   createdDocumentVersions IngestionDocumentVersion[] @relation("DocumentVersionCreatedBy")
   createdIngestionJobs    IngestionJob[]             @relation("IngestionJobCreatedBy")
+  detectedContradictions  Contradiction[]             @relation("ContradictionDetectedBy")
+  resolvedContradictions  Contradiction[]             @relation("ContradictionResolvedBy")
+  contradictionLogActions  ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
 
   @@index([email])
   @@index([status])
@@ -68,6 +71,7 @@ model Organization {
   extractedEntities        ExtractedEntity[]
   extractedRelationships   ExtractedRelationship[]
   extractedReferences      ExtractedReference[]
+  contradictions           Contradiction[]
 
   @@index([slug])
   @@index([ownerId])
@@ -646,4 +650,55 @@ model IngestionValidationIssue {
 
   @@index([jobId])
   @@index([jobId, severity])
+}
+
+model Contradiction {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  type               String
+  severity           String   @default("NEEDS_REVIEW")
+  status             String   @default("DETECTED")
+  label              String
+  description        String
+  sourceEntityIds    Json     @default("[]")
+  sourceDocumentIds  Json     @default("[]")
+  supportingEvidence Json     @default("[]")
+  conflictingEvidence Json    @default("[]")
+  traceabilityChain  Json     @default("[]")
+  affectedEntities   Json     @default("[]")
+  detectedById       String?
+  resolvedById       String?
+  resolutionNotes    String?
+  detectedAt         DateTime @default(now())
+  resolvedAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  detectedBy   User?          @relation("ContradictionDetectedBy", fields: [detectedById], references: [id])
+  resolvedBy   User?          @relation("ContradictionResolvedBy", fields: [resolvedById], references: [id])
+  lifecycleLogs ContradictionLifecycleLog[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+  @@index([organizationId, severity])
+  @@index([detectedAt])
+}
+
+model ContradictionLifecycleLog {
+  id              String   @id @default(cuid())
+  contradictionId String
+  action          String
+  fromStatus      String?
+  toStatus        String
+  metadata        Json?
+  performedById   String?
+  createdAt       DateTime @default(now())
+
+  contradiction Contradiction @relation(fields: [contradictionId], references: [id], onDelete: Cascade)
+  performedBy   User?          @relation("ContradictionLogPerformedBy", fields: [performedById], references: [id])
+
+  @@index([contradictionId])
+  @@index([createdAt])
 }
