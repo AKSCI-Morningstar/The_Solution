@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { logger } from "@/shared/logging";
 import { NotFoundError } from "@/shared/errors";
 import { RULE_EXECUTION_CONCURRENCY } from "../constants";
+import { recordRuleAudit } from "../audit";
 import type { RuleCondition } from "../condition-types";
 import { extractFragmentIds } from "../validation-engine";
 import { evaluateCondition, collectMatchedEntityIds } from "./evaluate-condition";
@@ -200,16 +201,6 @@ async function getUnmetDependencies(
   return unmet;
 }
 
-async function recordAudit(
-  action: string,
-  ruleId: string,
-  metadata: Record<string, unknown>,
-): Promise<void> {
-  await prisma.auditLog.create({
-    data: { action, entity: "Rule", entityId: ruleId, metadata: metadata as Prisma.InputJsonValue },
-  });
-}
-
 /**
  * Evaluates one rule against every EngineeringEntity matching its scope (or
  * just `options.subjectEntityId` if given), persisting an immutable
@@ -302,7 +293,7 @@ export async function executeRule(
           subjectEntityId: subject.id,
           error: error instanceof Error ? error.message : String(error),
         });
-        await recordAudit("RULE_EXECUTION_FAILED", ruleId, {
+        await recordRuleAudit(organizationId, "RULE_EXECUTION_FAILED", ruleId, {
           subjectEntityId: subject.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -417,7 +408,10 @@ async function evaluateForSubject(
     },
   });
 
-  await recordAudit("RULE_EXECUTED", rule.id, { subjectEntityId: subject.id, outcome });
+  await recordRuleAudit(organizationId, "RULE_EXECUTED", rule.id, {
+    subjectEntityId: subject.id,
+    outcome,
+  });
 
   return { id: created.id, ruleId: rule.id, subjectEntityId: subject.id, outcome, cached: false };
 }

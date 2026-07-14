@@ -17,30 +17,33 @@ function createEntry(
   return { level, message, timestamp: new Date().toISOString(), context };
 }
 
+const LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
+
+function configuredLevel(): LogLevel {
+  const value = process.env.LOG_LEVEL;
+  return (LOG_LEVELS as string[]).includes(value ?? "") ? (value as LogLevel) : "info";
+}
+
 function shouldLog(level: LogLevel): boolean {
   if (isDev()) {
     return true;
   }
-  const envLevel: LogLevel = "info";
-  const levels: LogLevel[] = ["debug", "info", "warn", "error"];
-  return levels.indexOf(level) >= levels.indexOf(envLevel);
+  return LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(configuredLevel());
 }
 
 function write(entry: LogEntry): void {
+  const sink =
+    entry.level === "error" ? console.error : entry.level === "warn" ? console.warn : console.log;
+
   if (isDev()) {
     const prefix = `[${entry.level.toUpperCase()}] ${entry.timestamp}`;
     const details = entry.context ? ` ${JSON.stringify(entry.context)}` : "";
-    switch (entry.level) {
-      case "error":
-        console.error(`${prefix}: ${entry.message}${details}`);
-        break;
-      case "warn":
-        console.warn(`${prefix}: ${entry.message}${details}`);
-        break;
-      default:
-        console.log(`${prefix}: ${entry.message}${details}`);
-    }
+    sink(`${prefix}: ${entry.message}${details}`);
+    return;
   }
+
+  // Production: one JSON object per line, matched by most log aggregators (CloudWatch, Datadog, etc.)
+  sink(JSON.stringify(entry));
 }
 
 export const logger = {

@@ -6,15 +6,15 @@ Sessions provide a secure, revocable way to maintain authenticated state across 
 
 ## Session Creation
 
-1. User credentials are validated by `loginUser()`
+1. User credentials are validated by `loginUser()` (itself gated by an in-process login rate limiter - see `docs/security.md`)
 2. `createSession()` generates a 48-byte random token
-3. Token, user ID, metadata (user agent, IP), and expiry are stored in the `Session` table
-4. An httpOnly cookie (`morningstar_session`) is set on the response
+3. A SHA-256 hash of the token (never the raw token itself), user ID, metadata (user agent, IP), and expiry are stored in the `Session` table
+4. An httpOnly cookie (`morningstar_session`) holding the _raw_ token is set on the response
 
 ## Session Validation
 
-1. Each protected request goes through middleware
-2. `validateSession()` reads the cookie and queries the database
+1. Each protected request goes through middleware, which redirects unauthenticated page requests to `/login` and returns `401` for unauthenticated API requests
+2. `validateSession()` reads the cookie, hashes the token, and queries the database by that hash
 3. Checks: token exists, not revoked, not expired
 4. Expired sessions are automatically cleaned up
 5. Returns `{ userId, sessionId }` or null
@@ -27,7 +27,8 @@ Every authenticated API request triggers `renewSession()` which extends the sess
 
 - **Logout**: Deletes the session from the database, clears the cookie
 - **Expiry**: Sessions automatically expire after the configured duration
-- **Revocation**: Future "logout everywhere" support via `destroyAllUserSessions()`
+- **Password reset**: `destroyAllUserSessions()` deletes every session belonging to the user as part of `resetPassword()` - a stolen session cookie doesn't survive a password reset
+- **Revocation**: `destroyAllUserSessions()` is also available standalone for a future "logout everywhere" user-initiated action; only the password-reset path calls it automatically today
 
 ## Cookie Configuration
 

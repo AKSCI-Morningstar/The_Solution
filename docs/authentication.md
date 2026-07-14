@@ -19,16 +19,17 @@ The Morningstar Solution uses a session-based authentication system built on Nex
 
 1. User submits email and password via the login form
 2. `POST /api/auth/login` calls `loginUser()` in the auth service
-3. Service looks up user by email, verifies password hash with `timingSafeEqual`
-4. Failed attempts are logged as `auth.login.failed`
-5. On success: session is created (httpOnly cookie), `lastLoginAt` updated, `auth.login.success` event logged
-6. User is redirected to dashboard
+3. Before touching the database, the request is checked against an in-process rate limiter keyed by both the submitted email and the source IP - a request over the threshold (10 attempts per 15-minute window per key) is rejected with `429` and a `Retry-After` header, without ever reaching the password check
+4. Service looks up user by email, verifies password hash with `timingSafeEqual`
+5. Failed attempts (wrong password, unknown email, disabled account) are logged as `auth.login.failed` and count against the rate limit
+6. On success: the email's rate-limit counter is cleared, a session is created (httpOnly cookie), `lastLoginAt` updated, `auth.login.success` event logged
+7. User is redirected to dashboard
 
 ### Session Validation
 
-1. Every authenticated API request passes through middleware
+1. Every request (API and page) passes through middleware, which redirects unauthenticated page requests to `/login` and returns `401` for unauthenticated API requests, based purely on cookie presence
 2. `src/middleware.ts` reads the "morningstar_session" cookie
-3. `src/server/auth/session-service.ts:validateSession()` queries the Session table
+3. `src/server/auth/session-service.ts:validateSession()` hashes the cookie's token (SHA-256) and queries the Session table by that hash - the raw token itself is never persisted, so a database leak alone cannot be replayed as a live session
 4. Validates: token exists, not revoked, not expired
 5. Expired sessions are automatically cleaned up
 6. Returns `{ userId, sessionId }` or null
@@ -43,9 +44,9 @@ The Morningstar Solution uses a session-based authentication system built on Nex
 ### Password Reset
 
 1. User requests reset via `POST /api/auth/forgot-password`
-2. A `VerificationToken` of type `password_reset` is created (1-hour expiry)
-3. Token is stored as random 48-byte hex string
-4. `POST /api/auth/reset-password` consumes the token, hashes new password, updates user
+2. A `VerificationToken` of type `password_reset` is created (1-hour expiry); the raw token is a random 48-byte hex string, but only its SHA-256 hash is persisted
+3. `POST /api/auth/reset-password` consumes the token (looked up by hash), hashes the new password, updates the user
+4. Every existing session for that user is destroyed as part of the same reset - a compromised account can't be "reset back" into by whoever held the old password's session
 5. Used tokens cannot be replayed
 6. AuthEvent logged at request and completion
 
@@ -62,16 +63,16 @@ The Morningstar Solution uses a session-based authentication system built on Nex
 
 ### Session Security
 
-- Session tokens are 48 random bytes, hex-encoded
+- Session tokens are 48 random bytes, hex-encoded, generated client-facing; only a SHA-256 hash of the token is ever written to the `Session` table
 - Cookies are httpOnly, SameSite=Lax, Secure in production
 - Sessions have configurable expiry (24h default, 30d with "remember me")
 - Expired sessions are cleaned up on validation
-- Sessions can be revoked (for future "logout everywhere" support)
+- All of a user's sessions are destroyed via `destroyAllUserSessions()` whenever that user's password is reset
 
 ### API Protection
 
 - All `/api/auth/*` endpoints validate input
-- Rate limiting architecture in place for future implementation
+- `POST /api/auth/login` is rate-limited in-process (10 attempts per 15 minutes, keyed by email and by source IP independently) - a first line of defense against credential stuffing and password spraying. This state lives in a single process's memory: it resets on restart and is not shared across horizontally-scaled instances. A multi-instance deployment should back this with a shared store (Redis or equivalent) instead
 - CORS and security headers managed by Next.js configuration
 - Request sanitization via Zod validation
 
@@ -85,9 +86,9 @@ Login → Create Session → Set Cookie → API Requests → Validate → Renew 
 
 ## Auth Guards
 
-### API Routes
+### API Routes and Pages
 
-The middleware at `src/middleware.ts` protects all API routes except public auth endpoints. Unauthenticated requests receive a 401 response.
+The middleware at `src/middleware.ts` protects all routes except an explicit public allowlist (the marketing home page, `/login`, `/register`, `/forgot-password`, `/reset-password`, and their `/api/auth/*` equivalents). An unauthenticated request to a protected API route receives a `401`; an unauthenticated request to a protected page is redirected to `/login?next=<original path>` server-side, before any page content renders.
 
 ### Client Components
 
@@ -114,7 +115,7 @@ Use `getCurrentUser()` to check authentication in server components and server a
 ### Session
 
 - `id` (cuid) - Primary key
-- `token` (unique) - Random session token
+- `token` (unique) - SHA-256 hash of the session token (the raw token only ever lives in the httpOnly cookie)
 - `userId` - Foreign key to User
 - `userAgent` / `ipAddress` - Request metadata
 - `expiresAt` - Session expiry
@@ -123,6 +124,7 @@ Use `getCurrentUser()` to check authentication in server components and server a
 ### VerificationToken
 
 - Used for password reset (future: email verification)
+- `token` (unique) - SHA-256 hash of the token (same rationale as `Session.token`)
 - One-time use with expiry
 - Tokens cannot be replayed
 

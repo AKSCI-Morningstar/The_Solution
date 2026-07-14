@@ -1,8 +1,13 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/server/db";
 
 function generateToken(): string {
   return randomBytes(48).toString("hex");
+}
+
+/** Same rationale as session-service's hashToken: only the hash is ever persisted. */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 export async function createVerificationToken(
@@ -14,7 +19,7 @@ export async function createVerificationToken(
   const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
   await prisma.verificationToken.create({
-    data: { token, userId, type, expiresAt },
+    data: { token: hashToken(token), userId, type, expiresAt },
   });
 
   return token;
@@ -24,7 +29,7 @@ export async function consumeVerificationToken(
   token: string,
   type: string,
 ): Promise<{ userId: string } | null> {
-  const record = await prisma.verificationToken.findUnique({ where: { token } });
+  const record = await prisma.verificationToken.findUnique({ where: { token: hashToken(token) } });
 
   if (!record) return null;
   if (record.type !== type) return null;

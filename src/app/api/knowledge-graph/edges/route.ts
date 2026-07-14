@@ -2,11 +2,22 @@ import { NextResponse } from "next/server";
 import { getGraphEdges } from "@/server/knowledge-graph";
 import { edgesQuerySchema } from "@/server/knowledge-graph/validation";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "knowledge_graph:read");
+
     const url = new URL(request.url);
     const parsed = edgesQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
     if (!parsed.success) {

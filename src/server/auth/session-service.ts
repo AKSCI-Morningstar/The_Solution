@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/server/db";
 
@@ -15,6 +15,15 @@ function generateSessionToken(): string {
   return randomBytes(48).toString("hex");
 }
 
+/**
+ * The database stores only this hash, never the raw token - a leaked backup
+ * or read-replica dump can't be used to hijack a session, since the raw
+ * token (the only thing the hash can be reversed from) never touches disk.
+ */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export async function createSession(
   userId: string,
   opts?: { rememberMe?: boolean; userAgent?: string; ipAddress?: string },
@@ -25,7 +34,7 @@ export async function createSession(
 
   await prisma.session.create({
     data: {
-      token,
+      token: hashToken(token),
       userId,
       userAgent: opts?.userAgent,
       ipAddress: opts?.ipAddress,
@@ -50,7 +59,7 @@ export async function validateSession(): Promise<SessionPayload | null> {
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
 
-  const session = await prisma.session.findUnique({ where: { token } });
+  const session = await prisma.session.findUnique({ where: { token: hashToken(token) } });
   if (!session) return null;
   if (session.isRevoked) return null;
   if (session.expiresAt < new Date()) {
@@ -66,7 +75,7 @@ export async function renewSession(): Promise<void> {
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return;
 
-  const session = await prisma.session.findUnique({ where: { token } });
+  const session = await prisma.session.findUnique({ where: { token: hashToken(token) } });
   if (!session || session.isRevoked) return;
 
   const hours = SESSION_EXPIRY_HOURS;
@@ -91,7 +100,7 @@ export async function destroySession(): Promise<void> {
   const token = cookieStore.get(COOKIE_NAME)?.value;
 
   if (token) {
-    await prisma.session.deleteMany({ where: { token } });
+    await prisma.session.deleteMany({ where: { token: hashToken(token) } });
   }
 
   cookieStore.set(COOKIE_NAME, "", {

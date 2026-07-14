@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET() {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "organization:read");
 
     const [totalEntities, totalDocuments, totalRelationships, completedJobs] = await Promise.all([
       prisma.engineeringEntity.count({

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 interface ActivityItem {
@@ -24,6 +26,15 @@ const MAX_LIMIT = 50;
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "organization:read");
+
     const url = new URL(request.url);
     const limit = Math.min(
       Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT)),

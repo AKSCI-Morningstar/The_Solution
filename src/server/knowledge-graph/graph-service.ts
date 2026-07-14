@@ -220,47 +220,56 @@ export async function getNodeNeighbors(nodeIndexId: string, organizationId: stri
   return { node, outgoing, incoming };
 }
 
+/**
+ * Breadth-first subgraph expansion, one batched pair of queries per depth
+ * level (all frontier node ids fetched together) instead of one pair per
+ * node - keeps a depth-3 expansion over a densely connected graph to a
+ * handful of round trips rather than one per visited node.
+ */
 export async function expandSubgraph(nodeIds: string[], organizationId: string, depth: number = 1) {
   const visited = new Set<string>();
   const visitedEdges = new Set<string>();
   const nodes: Record<string, GraphNodeIndex> = {};
   const edges: SubgraphEdge[] = [];
 
-  async function expand(currentIds: string[], currentDepth: number): Promise<void> {
-    if (currentDepth > depth) return;
+  let frontier = Array.from(new Set(nodeIds));
+  let currentDepth = 0;
 
-    for (const nid of currentIds) {
-      if (visited.has(nid)) continue;
-      visited.add(nid);
+  while (frontier.length > 0 && currentDepth <= depth) {
+    const idsToFetch = frontier.filter((id) => !visited.has(id));
+    idsToFetch.forEach((id) => visited.add(id));
+    if (idsToFetch.length === 0) break;
 
-      const node = await prisma.graphNodeIndex.findFirst({
-        where: { id: nid, organizationId },
-      });
-      if (!node) continue;
-
-      nodes[nid] = node;
-      const rels = await prisma.graphEdgeIndex.findMany({
-        where: { OR: [{ sourceNodeId: nid }, { targetNodeId: nid }], organizationId },
+    const [fetchedNodes, rels] = await Promise.all([
+      prisma.graphNodeIndex.findMany({ where: { id: { in: idsToFetch }, organizationId } }),
+      prisma.graphEdgeIndex.findMany({
+        where: {
+          OR: [{ sourceNodeId: { in: idsToFetch } }, { targetNodeId: { in: idsToFetch } }],
+          organizationId,
+        },
         include: {
           sourceNode: { select: { id: true, entityId: true, label: true, entityType: true } },
           targetNode: { select: { id: true, entityId: true, label: true, entityType: true } },
         },
-      });
+      }),
+    ]);
 
-      const next: string[] = [];
-      for (const rel of rels) {
-        if (!visitedEdges.has(rel.id)) {
-          visitedEdges.add(rel.id);
-          edges.push(rel);
-        }
-        if (!visited.has(rel.sourceNodeId)) next.push(rel.sourceNodeId);
-        if (!visited.has(rel.targetNodeId)) next.push(rel.targetNodeId);
+    for (const node of fetchedNodes) nodes[node.id] = node;
+
+    const nextFrontier: string[] = [];
+    for (const rel of rels) {
+      if (!visitedEdges.has(rel.id)) {
+        visitedEdges.add(rel.id);
+        edges.push(rel);
       }
-      if (next.length > 0) await expand(next, currentDepth + 1);
+      if (!visited.has(rel.sourceNodeId)) nextFrontier.push(rel.sourceNodeId);
+      if (!visited.has(rel.targetNodeId)) nextFrontier.push(rel.targetNodeId);
     }
+
+    frontier = nextFrontier;
+    currentDepth += 1;
   }
 
-  await expand(nodeIds, 0);
   return { nodes: Object.values(nodes), edges };
 }
 

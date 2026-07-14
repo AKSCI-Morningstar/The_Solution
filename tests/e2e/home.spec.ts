@@ -3,9 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Home Page", () => {
   test("displays the main heading", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "The Morningstar Solution",
-    );
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("The Morningstar Solution");
   });
 
   test("displays the description", async ({ page }) => {
@@ -19,9 +17,8 @@ test.describe("Home Page", () => {
     await expect(button).toBeVisible();
   });
 
-  test("navigates to dashboard from nav", async ({ page }) => {
-    await page.goto("/");
+  test("redirects unauthenticated visitors away from the dashboard", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveTextContent("Dashboard");
+    await expect(page).toHaveURL(/\/login(\?|$)/);
   });
 });

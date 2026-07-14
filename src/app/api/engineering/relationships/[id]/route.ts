@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteRelationship } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
@@ -14,6 +15,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "engineering:delete");
+
     const { id } = await params;
     await deleteRelationship(id, orgId, user.id);
     return NextResponse.json({ data: { message: "Relationship deleted" } });

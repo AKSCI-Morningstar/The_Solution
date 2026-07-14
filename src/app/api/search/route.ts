@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { validateSession } from "@/server/auth/session-service";
+import { requirePermission } from "@/server/rbac";
 import { ENTITY_TYPE_LABELS } from "@/server/engineering/constants";
 import { AppError } from "@/shared/errors";
 
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
         { status: 401 },
       );
     }
+    await requirePermission(orgId, session.userId, "organization:read");
 
     const url = new URL(request.url);
     const q = (url.searchParams.get("q") ?? "").trim();

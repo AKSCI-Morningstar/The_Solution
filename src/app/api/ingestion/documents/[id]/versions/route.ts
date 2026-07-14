@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { uploadNewVersion } from "@/server/ingestion";
+import { config } from "@/shared/config";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError, ValidationError } from "@/shared/errors";
 
@@ -14,6 +16,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "documents:create");
+
     const { id } = await params;
 
     const formData = await request.formData();
@@ -21,6 +25,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!(file instanceof File)) {
       return NextResponse.json(
         { error: "Validation failed", details: { file: ["A file is required"] } },
+        { status: 400 },
+      );
+    }
+    if (file.size > config.ingestionMaxFileSizeBytes) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          details: {
+            file: [
+              `File exceeds the maximum allowed size of ${config.ingestionMaxFileSizeBytes / (1024 * 1024)}MB`,
+            ],
+          },
+        },
         { status: 400 },
       );
     }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loginUser } from "@/server/auth";
-import { UnauthorizedError } from "@/shared/errors";
+import { AppError, RateLimitedError } from "@/shared/errors";
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +28,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: result.user });
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
+    if (error instanceof RateLimitedError) {
+      const retryAfterSeconds = (error.details?.retryAfterSeconds as number | undefined) ?? 60;
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.statusCode, headers: { "Retry-After": String(retryAfterSeconds) } },
+      );
+    }
+    if (error instanceof AppError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
         { status: error.statusCode },

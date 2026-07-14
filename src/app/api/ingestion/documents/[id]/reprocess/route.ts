@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reprocessDocument } from "@/server/ingestion";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
@@ -14,6 +15,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "documents:manage");
+
     const { id } = await params;
     const job = await reprocessDocument(id, orgId, user.id);
     return NextResponse.json({ data: job }, { status: 201 });

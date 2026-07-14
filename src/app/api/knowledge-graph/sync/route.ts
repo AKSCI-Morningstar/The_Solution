@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { syncGraphIndexes } from "@/server/knowledge-graph";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function POST() {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "knowledge_graph:manage");
+
     const stats = await syncGraphIndexes(orgId);
     return NextResponse.json({ data: stats });
   } catch (error) {

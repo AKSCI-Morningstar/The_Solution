@@ -1,75 +1,84 @@
 import { prisma } from "@/server/db";
 import type { TraceabilityGraph, TraceabilityRecord } from "./types";
 
+const RELATED_ENTITY_SELECT = {
+  id: true,
+  identifier: true,
+  name: true,
+  entityType: true,
+  status: true,
+  version: true,
+  updatedAt: true,
+} as const;
+
+/**
+ * Breadth-first traversal batched per depth level - one entity query and one
+ * extracted-evidence query per level (covering every node discovered so far),
+ * not per node, matching buildEvidenceGraph()'s fan-out fix.
+ */
 export async function buildTraceabilityGraph(
   organizationId: string,
   rootEntityId: string,
   maxDepth: number,
 ): Promise<TraceabilityGraph> {
   const records: TraceabilityRecord[] = [];
-  const visited = new Set<string>();
-  const queue: { entityId: string; path: string[]; depth: number }[] = [
-    { entityId: rootEntityId, path: [], depth: 0 },
-  ];
+  const visited = new Set<string>([rootEntityId]);
 
-  while (queue.length > 0) {
-    const { entityId, path, depth } = queue.shift()!;
-    if (visited.has(entityId) || depth > maxDepth) continue;
-    visited.add(entityId);
+  let frontier = new Map<string, string[]>([[rootEntityId, []]]);
+  let depth = 0;
 
-    const entity = await prisma.engineeringEntity.findFirst({
-      where: { id: entityId, organizationId, deletedAt: null },
-      include: {
-        sourceRelationships: {
-          include: {
-            targetEntity: {
-              select: {
-                id: true,
-                identifier: true,
-                name: true,
-                entityType: true,
-                status: true,
-                version: true,
-                updatedAt: true,
-              },
-            },
-          },
+  while (frontier.size > 0 && depth <= maxDepth) {
+    const ids = Array.from(frontier.keys());
+
+    const [entities, docRefsByEntity] = await Promise.all([
+      prisma.engineeringEntity.findMany({
+        where: { id: { in: ids }, organizationId, deletedAt: null },
+        include: {
+          sourceRelationships: { include: { targetEntity: { select: RELATED_ENTITY_SELECT } } },
+          targetRelationships: { include: { sourceEntity: { select: RELATED_ENTITY_SELECT } } },
         },
-        targetRelationships: {
-          include: {
-            sourceEntity: {
-              select: {
-                id: true,
-                identifier: true,
-                name: true,
-                entityType: true,
-                status: true,
-                version: true,
-                updatedAt: true,
-              },
-            },
-          },
-        },
-      },
-    });
+      }),
+      prisma.extractedEntity.findMany({
+        where: { organizationId, linkedEntityId: { in: ids }, status: { not: "REJECTED" } },
+        include: { document: { select: { id: true, fileName: true, currentVersion: true } } },
+      }),
+    ]);
 
-    if (!entity) continue;
+    const docRefsByEntityId = new Map<string, typeof docRefsByEntity>();
+    for (const doc of docRefsByEntity) {
+      if (!doc.linkedEntityId) continue;
+      const list = docRefsByEntityId.get(doc.linkedEntityId) ?? [];
+      list.push(doc);
+      docRefsByEntityId.set(doc.linkedEntityId, list);
+    }
 
-    const docRefs = await prisma.extractedEntity.findMany({
-      where: {
-        organizationId,
-        linkedEntityId: entity.id,
-        status: { not: "REJECTED" },
-      },
-      include: {
-        document: {
-          select: { id: true, fileName: true, currentVersion: true },
-        },
-      },
-    });
+    const nextFrontier = new Map<string, string[]>();
 
-    if (docRefs.length > 0) {
-      for (const doc of docRefs) {
+    for (const entity of entities) {
+      const path = frontier.get(entity.id) ?? [];
+      const docRefs = docRefsByEntityId.get(entity.id) ?? [];
+
+      if (docRefs.length > 0) {
+        for (const doc of docRefs) {
+          records.push({
+            entityId: entity.id,
+            entityName: entity.name,
+            entityType: entity.entityType,
+            entityIdentifier: entity.identifier,
+            entityVersion: entity.version,
+            entityStatus: entity.status,
+            documentId: doc.document.id,
+            documentName: doc.document.fileName,
+            documentVersion: doc.document.currentVersion,
+            page: doc.page ?? undefined,
+            section: doc.section ?? undefined,
+            relationshipPath: path,
+            extractionMethod: doc.extractionMethod,
+            organizationId,
+            timestamp: entity.updatedAt.toISOString(),
+          });
+        }
+      } else {
         records.push({
           entityId: entity.id,
           entityName: entity.name,
@@ -77,52 +86,31 @@ export async function buildTraceabilityGraph(
           entityIdentifier: entity.identifier,
           entityVersion: entity.version,
           entityStatus: entity.status,
-          documentId: doc.document.id,
-          documentName: doc.document.fileName,
-          documentVersion: doc.document.currentVersion,
-          page: doc.page ?? undefined,
-          section: doc.section ?? undefined,
           relationshipPath: path,
-          extractionMethod: doc.extractionMethod,
           organizationId,
           timestamp: entity.updatedAt.toISOString(),
         });
       }
-    } else {
-      records.push({
-        entityId: entity.id,
-        entityName: entity.name,
-        entityType: entity.entityType,
-        entityIdentifier: entity.identifier,
-        entityVersion: entity.version,
-        entityStatus: entity.status,
-        relationshipPath: path,
-        organizationId,
-        timestamp: entity.updatedAt.toISOString(),
-      });
-    }
 
-    for (const rel of entity.sourceRelationships) {
-      const target = rel.targetEntity;
-      if (!visited.has(target.id) && depth + 1 <= maxDepth) {
-        queue.push({
-          entityId: target.id,
-          path: [...path, `${rel.relationshipType}->${target.name}`],
-          depth: depth + 1,
-        });
+      for (const rel of entity.sourceRelationships) {
+        const target = rel.targetEntity;
+        if (!visited.has(target.id)) {
+          visited.add(target.id);
+          nextFrontier.set(target.id, [...path, `${rel.relationshipType}->${target.name}`]);
+        }
+      }
+
+      for (const rel of entity.targetRelationships) {
+        const source = rel.sourceEntity;
+        if (!visited.has(source.id)) {
+          visited.add(source.id);
+          nextFrontier.set(source.id, [...path, `${source.name}->${rel.relationshipType}`]);
+        }
       }
     }
 
-    for (const rel of entity.targetRelationships) {
-      const source = rel.sourceEntity;
-      if (!visited.has(source.id) && depth + 1 <= maxDepth) {
-        queue.push({
-          entityId: source.id,
-          path: [...path, `${source.name}->${rel.relationshipType}`],
-          depth: depth + 1,
-        });
-      }
-    }
+    frontier = nextFrontier;
+    depth += 1;
   }
 
   return {

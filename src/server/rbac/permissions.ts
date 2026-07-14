@@ -4,6 +4,11 @@ export const Resources = {
   ROLES: "roles",
   SETTINGS: "settings",
   RULES: "rules",
+  ENGINEERING: "engineering",
+  DOCUMENTS: "documents",
+  KNOWLEDGE_GRAPH: "knowledge_graph",
+  EVIDENCE: "evidence",
+  CONTRADICTIONS: "contradictions",
 } as const;
 
 export const Actions = {
@@ -47,6 +52,33 @@ export const Permissions = {
     execute: "rules:execute",
     manage: "rules:manage",
   },
+  engineering: {
+    read: "engineering:read",
+    create: "engineering:create",
+    update: "engineering:update",
+    delete: "engineering:delete",
+    manage: "engineering:manage",
+  },
+  documents: {
+    read: "documents:read",
+    create: "documents:create",
+    manage: "documents:manage",
+  },
+  knowledgeGraph: {
+    read: "knowledge_graph:read",
+    create: "knowledge_graph:create",
+    delete: "knowledge_graph:delete",
+    manage: "knowledge_graph:manage",
+  },
+  evidence: {
+    read: "evidence:read",
+    execute: "evidence:execute",
+  },
+  contradictions: {
+    read: "contradictions:read",
+    update: "contradictions:update",
+    manage: "contradictions:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -67,7 +99,24 @@ export type PermissionString =
   | "rules:update"
   | "rules:delete"
   | "rules:execute"
-  | "rules:manage";
+  | "rules:manage"
+  | "engineering:read"
+  | "engineering:create"
+  | "engineering:update"
+  | "engineering:delete"
+  | "engineering:manage"
+  | "documents:read"
+  | "documents:create"
+  | "documents:manage"
+  | "knowledge_graph:read"
+  | "knowledge_graph:create"
+  | "knowledge_graph:delete"
+  | "knowledge_graph:manage"
+  | "evidence:read"
+  | "evidence:execute"
+  | "contradictions:read"
+  | "contradictions:update"
+  | "contradictions:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -88,6 +137,23 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.rules.delete,
   Permissions.rules.execute,
   Permissions.rules.manage,
+  Permissions.engineering.read,
+  Permissions.engineering.create,
+  Permissions.engineering.update,
+  Permissions.engineering.delete,
+  Permissions.engineering.manage,
+  Permissions.documents.read,
+  Permissions.documents.create,
+  Permissions.documents.manage,
+  Permissions.knowledgeGraph.read,
+  Permissions.knowledgeGraph.create,
+  Permissions.knowledgeGraph.delete,
+  Permissions.knowledgeGraph.manage,
+  Permissions.evidence.read,
+  Permissions.evidence.execute,
+  Permissions.contradictions.read,
+  Permissions.contradictions.update,
+  Permissions.contradictions.manage,
 ];
 
 export interface RoleDefinition {
@@ -125,6 +191,23 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.rules.delete,
       Permissions.rules.execute,
       Permissions.rules.manage,
+      Permissions.engineering.read,
+      Permissions.engineering.create,
+      Permissions.engineering.update,
+      Permissions.engineering.delete,
+      Permissions.engineering.manage,
+      Permissions.documents.read,
+      Permissions.documents.create,
+      Permissions.documents.manage,
+      Permissions.knowledgeGraph.read,
+      Permissions.knowledgeGraph.create,
+      Permissions.knowledgeGraph.delete,
+      Permissions.knowledgeGraph.manage,
+      Permissions.evidence.read,
+      Permissions.evidence.execute,
+      Permissions.contradictions.read,
+      Permissions.contradictions.update,
+      Permissions.contradictions.manage,
     ],
   },
   {
@@ -138,6 +221,11 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.roles.read,
       Permissions.settings.read,
       Permissions.rules.read,
+      Permissions.engineering.read,
+      Permissions.documents.read,
+      Permissions.knowledgeGraph.read,
+      Permissions.evidence.read,
+      Permissions.contradictions.read,
     ],
   },
   {
@@ -154,6 +242,18 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.rules.create,
       Permissions.rules.update,
       Permissions.rules.execute,
+      Permissions.engineering.read,
+      Permissions.engineering.create,
+      Permissions.engineering.update,
+      Permissions.documents.read,
+      Permissions.documents.create,
+      Permissions.documents.manage,
+      Permissions.knowledgeGraph.read,
+      Permissions.knowledgeGraph.create,
+      Permissions.evidence.read,
+      Permissions.evidence.execute,
+      Permissions.contradictions.read,
+      Permissions.contradictions.update,
     ],
   },
   {
@@ -166,6 +266,11 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.roles.read,
       Permissions.settings.read,
       Permissions.rules.read,
+      Permissions.engineering.read,
+      Permissions.documents.read,
+      Permissions.knowledgeGraph.read,
+      Permissions.evidence.read,
+      Permissions.contradictions.read,
     ],
   },
 ];

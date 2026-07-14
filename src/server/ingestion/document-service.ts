@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { prisma } from "@/server/db";
+import { config } from "@/shared/config";
 import { NotFoundError, ValidationError } from "@/shared/errors";
 import { logger } from "@/shared/logging";
 import { SUPPORTED_EXTENSIONS } from "./constants";
@@ -29,6 +30,16 @@ function assertSupportedExtension(extension: string): void {
   }
 }
 
+function assertWithinSizeLimit(sizeBytes: number): void {
+  if (sizeBytes > config.ingestionMaxFileSizeBytes) {
+    throw new ValidationError({
+      file: [
+        `File exceeds the maximum allowed size of ${config.ingestionMaxFileSizeBytes / (1024 * 1024)}MB`,
+      ],
+    });
+  }
+}
+
 export async function uploadDocument(
   organizationId: string,
   userId: string,
@@ -36,6 +47,7 @@ export async function uploadDocument(
 ) {
   const extension = extensionOf(file.fileName);
   assertSupportedExtension(extension);
+  assertWithinSizeLimit(file.buffer.length);
 
   const document = await prisma.ingestionDocument.create({
     data: {
@@ -88,6 +100,7 @@ export async function uploadNewVersion(
 
   const extension = extensionOf(file.fileName);
   assertSupportedExtension(extension);
+  assertWithinSizeLimit(file.buffer.length);
 
   const nextVersion = document.currentVersion + 1;
   const storageKey = await storageAdapter.save(

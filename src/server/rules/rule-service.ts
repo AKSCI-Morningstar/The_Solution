@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { NotFoundError, ValidationError } from "@/shared/errors";
 import { logger } from "@/shared/logging";
+import { recordRuleAudit } from "./audit";
 import type { RuleCondition, RuleScope } from "./condition-types";
 import {
   checkBrokenConditions,
@@ -63,16 +64,6 @@ async function assertValid(
   }
 }
 
-async function recordAudit(
-  action: string,
-  ruleId: string,
-  metadata: Record<string, unknown>,
-): Promise<void> {
-  await prisma.auditLog.create({
-    data: { action, entity: "Rule", entityId: ruleId, metadata: metadata as Prisma.InputJsonValue },
-  });
-}
-
 async function replaceDependencies(
   tx: Prisma.TransactionClient,
   organizationId: string,
@@ -129,7 +120,10 @@ export async function createRule(organizationId: string, userId: string, input: 
     return created;
   });
 
-  await recordAudit("RULE_CREATED", rule.id, { name: rule.name, category: rule.category });
+  await recordRuleAudit(organizationId, "RULE_CREATED", rule.id, {
+    name: rule.name,
+    category: rule.category,
+  });
   logger.info("Rule created", { ruleId: rule.id, organizationId });
   return rule;
 }
@@ -197,7 +191,7 @@ export async function updateRule(
     return result;
   });
 
-  await recordAudit("RULE_UPDATED", ruleId, { version: nextVersion });
+  await recordRuleAudit(organizationId, "RULE_UPDATED", ruleId, { version: nextVersion });
   return updated;
 }
 
@@ -227,7 +221,7 @@ export async function deleteRule(
     where: { id: ruleId },
     data: { deletedAt: new Date(), updatedById: userId },
   });
-  await recordAudit("RULE_DELETED", ruleId, { name: existing.name });
+  await recordRuleAudit(organizationId, "RULE_DELETED", ruleId, { name: existing.name });
 }
 
 export async function publishRule(ruleId: string, organizationId: string, userId: string) {
@@ -260,8 +254,8 @@ export async function publishRule(ruleId: string, organizationId: string, userId
     data: { status: "ACTIVE", publishedAt: new Date(), publishedById: userId },
   });
 
-  await recordAudit("RULE_APPROVED", ruleId, { name: existing.name });
-  await recordAudit("RULE_PUBLISHED", ruleId, { name: existing.name });
+  await recordRuleAudit(organizationId, "RULE_APPROVED", ruleId, { name: existing.name });
+  await recordRuleAudit(organizationId, "RULE_PUBLISHED", ruleId, { name: existing.name });
   return published;
 }
 

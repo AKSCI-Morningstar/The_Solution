@@ -66,3 +66,10 @@ export class ConfigurationError extends AppError {
     this.name = "ConfigurationError";
   }
 }
+
+export class RateLimitedError extends AppError {
+  constructor(message: string = "Too many requests", retryAfterSeconds?: number) {
+    super(message, "RATE_LIMITED", 429, retryAfterSeconds ? { retryAfterSeconds } : undefined);
+    this.name = "RateLimitedError";
+  }
+}

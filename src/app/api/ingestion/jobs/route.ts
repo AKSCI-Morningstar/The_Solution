@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { createJob, jobFilterSchema, listJobs, startJobSchema } from "@/server/ingestion";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "documents:read");
+
     const url = new URL(request.url);
     const parsed = jobFilterSchema.safeParse(Object.fromEntries(url.searchParams.entries()));
     if (!parsed.success) {
@@ -38,6 +48,8 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "documents:create");
+
     const body = await request.json();
     const parsed = startJobSchema.safeParse(body);
     if (!parsed.success) {

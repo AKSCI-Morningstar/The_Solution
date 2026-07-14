@@ -1,7 +1,12 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/server/db";
 import { validateSession } from "@/server/auth/session-service";
+import { DEFAULT_ROLES } from "@/server/rbac/permissions";
 import { NotFoundError, ValidationError, ForbiddenError } from "@/shared/errors";
+
+export const INVITABLE_ROLE_SLUGS = new Set(
+  DEFAULT_ROLES.filter((r) => r.slug !== "owner").map((r) => r.slug),
+);
 
 export interface MemberResult {
   id: string;
@@ -69,7 +74,7 @@ export async function listMembers(organizationId: string): Promise<MemberResult[
 export async function inviteMember(
   organizationId: string,
   email: string,
-  role: string = "member",
+  role: string = "viewer",
 ): Promise<{ invitationId: string }> {
   const session = await validateSession();
   if (!session) throw new ForbiddenError("Not authenticated");
@@ -81,6 +86,12 @@ export async function inviteMember(
 
   if (!email || typeof email !== "string" || !email.includes("@")) {
     throw new ValidationError({ email: ["Valid email is required"] });
+  }
+
+  if (!INVITABLE_ROLE_SLUGS.has(role)) {
+    throw new ValidationError({
+      role: [`Role must be one of: ${Array.from(INVITABLE_ROLE_SLUGS).join(", ")}`],
+    });
   }
 
   const normalizedEmail = email.toLowerCase().trim();

@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import { listDocuments, uploadDocument, documentFilterSchema } from "@/server/ingestion";
+import { config } from "@/shared/config";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError, ValidationError } from "@/shared/errors";
 
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "documents:read");
+
     const url = new URL(request.url);
     const parsed = documentFilterSchema.safeParse(Object.fromEntries(url.searchParams.entries()));
     if (!parsed.success) {
@@ -39,11 +50,26 @@ export async function POST(request: Request) {
       );
     }
 
+    await requirePermission(orgId, user.id, "documents:create");
+
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json(
         { error: "Validation failed", details: { file: ["A file is required"] } },
+        { status: 400 },
+      );
+    }
+    if (file.size > config.ingestionMaxFileSizeBytes) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          details: {
+            file: [
+              `File exceeds the maximum allowed size of ${config.ingestionMaxFileSizeBytes / (1024 * 1024)}MB`,
+            ],
+          },
+        },
         { status: 400 },
       );
     }

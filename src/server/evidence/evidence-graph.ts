@@ -35,6 +35,23 @@ function mapRelationshipTypeToEvidenceRelation(relType: string): EvidenceRelatio
   return mapping[relType] ?? "REFERENCES";
 }
 
+const RELATED_ENTITY_SELECT = {
+  id: true,
+  identifier: true,
+  name: true,
+  entityType: true,
+  status: true,
+  version: true,
+  updatedAt: true,
+} as const;
+
+/**
+ * Breadth-first traversal of the entity relationship graph, one batched query
+ * per depth level (all frontier ids fetched together) rather than one query
+ * per node - the same fan-out pattern the Rule Engine's buildSharedContext()
+ * uses, so a graph with thousands of nodes at maxDepth=5 costs at most 5
+ * round trips instead of thousands.
+ */
 export async function buildEvidenceGraph(
   organizationId: string,
   rootEntityId: string,
@@ -42,104 +59,80 @@ export async function buildEvidenceGraph(
 ): Promise<EvidenceGraph> {
   const nodes = new Map<string, EvidenceNode>();
   const edges: EvidenceEdge[] = [];
-  const visited = new Set<string>();
-  const queue: { entityId: string; depth: number }[] = [{ entityId: rootEntityId, depth: 0 }];
+  const visited = new Set<string>([rootEntityId]);
 
-  while (queue.length > 0) {
-    const { entityId, depth } = queue.shift()!;
+  let frontier = [rootEntityId];
+  let depth = 0;
 
-    if (visited.has(entityId) || depth > maxDepth) continue;
-    visited.add(entityId);
-
-    const entity = await prisma.engineeringEntity.findFirst({
-      where: { id: entityId, organizationId, deletedAt: null },
+  while (frontier.length > 0 && depth <= maxDepth) {
+    const entities = await prisma.engineeringEntity.findMany({
+      where: { id: { in: frontier }, organizationId, deletedAt: null },
       include: {
-        sourceRelationships: {
-          include: {
-            targetEntity: {
-              select: {
-                id: true,
-                identifier: true,
-                name: true,
-                entityType: true,
-                status: true,
-                version: true,
-                updatedAt: true,
-              },
-            },
-          },
-        },
-        targetRelationships: {
-          include: {
-            sourceEntity: {
-              select: {
-                id: true,
-                identifier: true,
-                name: true,
-                entityType: true,
-                status: true,
-                version: true,
-                updatedAt: true,
-              },
-            },
-          },
-        },
+        sourceRelationships: { include: { targetEntity: { select: RELATED_ENTITY_SELECT } } },
+        targetRelationships: { include: { sourceEntity: { select: RELATED_ENTITY_SELECT } } },
       },
     });
 
-    if (!entity) continue;
+    const nextFrontier: string[] = [];
 
-    const nodeType = mapEntityTypeToNodeType(entity.entityType);
-    const nodeId = `entity:${entity.id}`;
-    if (!nodes.has(nodeId)) {
-      nodes.set(nodeId, {
-        id: nodeId,
-        type: nodeType,
-        label: entity.name,
-        entityId: entity.id,
-        entityType: entity.entityType,
-        status: entity.status,
-        version: entity.version,
-        createdAt: entity.createdAt.toISOString(),
-        updatedAt: entity.updatedAt.toISOString(),
-      });
-    }
+    for (const entity of entities) {
+      const nodeType = mapEntityTypeToNodeType(entity.entityType);
+      const nodeId = `entity:${entity.id}`;
+      if (!nodes.has(nodeId)) {
+        nodes.set(nodeId, {
+          id: nodeId,
+          type: nodeType,
+          label: entity.name,
+          entityId: entity.id,
+          entityType: entity.entityType,
+          status: entity.status,
+          version: entity.version,
+          createdAt: entity.createdAt.toISOString(),
+          updatedAt: entity.updatedAt.toISOString(),
+        });
+      }
 
-    for (const rel of entity.sourceRelationships) {
-      const target = rel.targetEntity;
-      const targetNodeId = `entity:${target.id}`;
-      const relationType = mapRelationshipTypeToEvidenceRelation(rel.relationshipType);
+      for (const rel of entity.sourceRelationships) {
+        const target = rel.targetEntity;
+        const targetNodeId = `entity:${target.id}`;
+        const relationType = mapRelationshipTypeToEvidenceRelation(rel.relationshipType);
 
-      edges.push({
-        id: `edge:${rel.id}`,
-        sourceId: nodeId,
-        targetId: targetNodeId,
-        relationType,
-        metadata: rel.metadata as Record<string, unknown> | undefined,
-      });
+        edges.push({
+          id: `edge:${rel.id}`,
+          sourceId: nodeId,
+          targetId: targetNodeId,
+          relationType,
+          metadata: rel.metadata as Record<string, unknown> | undefined,
+        });
 
-      if (!visited.has(target.id) && depth + 1 <= maxDepth) {
-        queue.push({ entityId: target.id, depth: depth + 1 });
+        if (!visited.has(target.id)) {
+          visited.add(target.id);
+          nextFrontier.push(target.id);
+        }
+      }
+
+      for (const rel of entity.targetRelationships) {
+        const source = rel.sourceEntity;
+        const sourceNodeId = `entity:${source.id}`;
+        const relationType = mapRelationshipTypeToEvidenceRelation(rel.relationshipType);
+
+        edges.push({
+          id: `edge-rev:${rel.id}`,
+          sourceId: sourceNodeId,
+          targetId: nodeId,
+          relationType,
+          metadata: rel.metadata as Record<string, unknown> | undefined,
+        });
+
+        if (!visited.has(source.id)) {
+          visited.add(source.id);
+          nextFrontier.push(source.id);
+        }
       }
     }
 
-    for (const rel of entity.targetRelationships) {
-      const source = rel.sourceEntity;
-      const sourceNodeId = `entity:${source.id}`;
-      const relationType = mapRelationshipTypeToEvidenceRelation(rel.relationshipType);
-
-      edges.push({
-        id: `edge-rev:${rel.id}`,
-        sourceId: sourceNodeId,
-        targetId: nodeId,
-        relationType,
-        metadata: rel.metadata as Record<string, unknown> | undefined,
-      });
-
-      if (!visited.has(source.id) && depth + 1 <= maxDepth) {
-        queue.push({ entityId: source.id, depth: depth + 1 });
-      }
-    }
+    frontier = nextFrontier;
+    depth += 1;
   }
 
   await addDocumentEvidence(organizationId, rootEntityId, nodes, edges);

@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { buildEvidenceGraph, buildEvidenceChains } from "@/server/evidence";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "evidence:read");
+
     const url = new URL(request.url);
     const entityId = url.searchParams.get("entityId");
     const maxDepth = Number(url.searchParams.get("maxDepth") ?? 5);

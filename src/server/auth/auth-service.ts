@@ -1,8 +1,14 @@
 import { prisma } from "@/server/db";
 import { hashPassword, verifyPassword } from "./password-service";
-import { createSession, destroySession, validateSession } from "./session-service";
+import {
+  createSession,
+  destroyAllUserSessions,
+  destroySession,
+  validateSession,
+} from "./session-service";
 import { createVerificationToken, consumeVerificationToken } from "./token-service";
-import { AppError, ValidationError, UnauthorizedError } from "@/shared/errors";
+import { checkLoginRateLimit, clearLoginAttempts, recordFailedLoginAttempt } from "./rate-limiter";
+import { AppError, ValidationError, UnauthorizedError, RateLimitedError } from "@/shared/errors";
 
 export interface RegisterInput {
   email: string;
@@ -50,17 +56,33 @@ interface LoginResult {
 export async function loginUser(input: LoginInput): Promise<LoginResult> {
   const { email, password, rememberMe, userAgent, ipAddress } = input;
 
+  const emailKey = `email:${email}`;
+  const ipKey = ipAddress ? `ip:${ipAddress}` : null;
+
+  const emailRetryAfter = checkLoginRateLimit(emailKey);
+  const ipRetryAfter = ipKey ? checkLoginRateLimit(ipKey) : null;
+  const retryAfter = emailRetryAfter ?? ipRetryAfter;
+  if (retryAfter !== null) {
+    throw new RateLimitedError("Too many login attempts. Try again later.", retryAfter);
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
+    recordFailedLoginAttempt(emailKey);
+    if (ipKey) recordFailedLoginAttempt(ipKey);
     throw new UnauthorizedError("Invalid email or password");
   }
 
   if (user.status !== "active") {
+    recordFailedLoginAttempt(emailKey);
+    if (ipKey) recordFailedLoginAttempt(ipKey);
     throw new UnauthorizedError("Account is disabled");
   }
 
   const isValid = verifyPassword(password, user.passwordHash);
   if (!isValid) {
+    recordFailedLoginAttempt(emailKey);
+    if (ipKey) recordFailedLoginAttempt(ipKey);
     await prisma.authEvent.create({
       data: {
         userId: user.id,
@@ -72,6 +94,8 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
     });
     throw new UnauthorizedError("Invalid email or password");
   }
+
+  clearLoginAttempts(emailKey);
 
   await createSession(user.id, { rememberMe, userAgent, ipAddress });
 
@@ -155,6 +179,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
     where: { id: result.userId },
     data: { passwordHash },
   });
+
+  // A leaked/stolen session should not survive a password reset - the whole
+  // point of the reset is to lock out whoever had access to the old password.
+  await destroyAllUserSessions(result.userId);
 
   await prisma.authEvent.create({
     data: { userId: result.userId, action: "auth.password.reset.completed" },

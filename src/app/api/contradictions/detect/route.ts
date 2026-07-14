@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { detectAndStoreContradictions, detectContradictionSchema } from "@/server/contradictions";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "contradictions:manage");
 
     const body = await request.json();
     const parsed = detectContradictionSchema.safeParse(body);

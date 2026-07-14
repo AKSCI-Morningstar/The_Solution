@@ -5,12 +5,22 @@ import {
   createRelationshipSchema,
 } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "engineering:read");
+
     const url = new URL(request.url);
     const filters = Object.fromEntries(url.searchParams.entries());
     const result = await listRelationships(orgId, filters);
@@ -36,6 +46,8 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "engineering:create");
+
     const body = await request.json();
     const parsed = createRelationshipSchema.safeParse(body);
     if (!parsed.success) {

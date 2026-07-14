@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { evaluateEvidence, evaluationInputSchema } from "@/server/evidence";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function POST(request: Request) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "evidence:execute");
+
     const body = await request.json();
     const parsed = evaluationInputSchema.safeParse(body);
     if (!parsed.success) {

@@ -8,12 +8,22 @@ import {
   changeEntityStatusSchema,
 } from "@/server/engineering";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "engineering:read");
+
     const { id } = await params;
     const entity = await getEntity(id, orgId);
     return NextResponse.json({ data: entity });
@@ -38,6 +48,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "engineering:update");
+
     const { id } = await params;
     const body = await request.json();
 
@@ -89,6 +101,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
         { status: 401 },
       );
     }
+    await requirePermission(orgId, user.id, "engineering:delete");
+
     const { id } = await params;
     await deleteEntity(id, orgId, user.id);
     return NextResponse.json({ data: { message: "Entity deleted" } });

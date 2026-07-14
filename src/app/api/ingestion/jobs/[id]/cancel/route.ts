@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { cancelJob } from "@/server/ingestion";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
+import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "documents:manage");
+
     const { id } = await params;
     const job = await cancelJob(id, orgId);
     return NextResponse.json({ data: job });

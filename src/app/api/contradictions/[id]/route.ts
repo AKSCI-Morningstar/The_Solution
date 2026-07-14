@@ -5,12 +5,22 @@ import {
   updateContradictionStatusSchema,
 } from "@/server/contradictions";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
+import { requirePermission } from "@/server/rbac";
 import { getCurrentUser } from "@/server/auth";
 import { AppError } from "@/shared/errors";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const orgId = await requireActiveOrganization();
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Not authenticated", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
+    await requirePermission(orgId, user.id, "contradictions:read");
+
     const { id } = await params;
     const url = new URL(request.url);
 
@@ -49,6 +59,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         { status: 401 },
       );
     }
+
+    await requirePermission(orgId, user.id, "contradictions:update");
 
     const { id } = await params;
     const body = await request.json();
