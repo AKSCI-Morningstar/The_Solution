@@ -46,8 +46,10 @@ model User {
   contradictionLogActions ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
   triggeredOrchestrations OrchestrationRun[]          @relation("OrchestrationTriggeredBy")
   triggeredRealityAssessments RealityAssessment[]     @relation("RealityAssessmentTriggeredBy")
-  notifications           Notification[]
+  notifications            Notification[]
   generatedReports         Report[]                  @relation("ReportGeneratedBy")
+  createdSuppliers         Supplier[]                @relation("SupplierCreatedBy")
+  updatedSuppliers         Supplier[]                @relation("SupplierUpdatedBy")
 
   @@index([email])
   @@index([status])
@@ -91,6 +93,9 @@ model Organization {
   realityAssessments       RealityAssessment[]
   notifications            Notification[]
   reports                  Report[]
+  suppliers                Supplier[]
+  supplierFacilities       SupplierFacility[]
+  supplierRelationships    SupplierRelationship[]
 
   @@index([slug])
   @@index([ownerId])
@@ -1051,4 +1056,194 @@ model Report {
   @@index([organizationId, isFavorite])
   @@index([generatedById])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Enterprise Supplier Intelligence Platform
+//
+// Manages suppliers, manufacturers, distributors, subcontractors, partners,
+// facilities, certifications, capabilities, and dependencies. Every supplier
+// relationship, capability, and certification is deterministic and
+// evidence-backed - stored alongside optional links to supporting documents
+// and the canonical EngineeringEntity/EngineeringRelationship graph.
+// ---------------------------------------------------------------------------
+
+model Supplier {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  supplierType       String    @default("SUPPLIER")
+  identifier         String
+  name               String
+  legalName          String?
+  description        String?
+  website            String?
+  taxId              String?
+  duns               String?
+  cageCode           String?
+  naicsCodes         Json?
+  industrySectors    Json?
+  supportedPrograms  Json?
+  locations          Json?
+  riskNotes          String?
+  engineeringNotes   String?
+  status             String    @default("ACTIVE")
+  metadata           Json?
+  tags               Json?
+  labels             Json?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("SupplierCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?        @relation("SupplierUpdatedBy", fields: [updatedById], references: [id])
+
+  contacts        SupplierContact[]
+  certifications  SupplierCertification[]
+  capabilities    SupplierCapability[]
+  facilities      SupplierFacility[]
+  outgoingRelationships SupplierRelationship[] @relation("SupplierRelSource")
+  incomingRelationships SupplierRelationship[] @relation("SupplierRelTarget")
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+  @@index([organizationId, supplierType])
+  @@index([organizationId, status])
+  @@index([deletedAt])
+}
+
+model SupplierContact {
+  id             String   @id @default(cuid())
+  supplierId     String
+  name           String
+  title          String?
+  email          String?
+  phone          String?
+  mobile         String?
+  role           String?
+  isPrimary      Boolean  @default(false)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([supplierId, isPrimary])
+}
+
+model SupplierCertification {
+  id               String    @id @default(cuid())
+  supplierId       String
+  certificationType String
+  certificationName String
+  issuingBody      String
+  certificateNumber String?
+  issueDate        DateTime?
+  expiryDate       DateTime?
+  status           String    @default("ACTIVE")
+  scope            String?
+  evidenceUrl      String?
+  evidenceDocumentId String?
+  notes            String?
+  verifiedAt       DateTime?
+  verifiedById     String?
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([supplierId, certificationType])
+  @@index([supplierId, status])
+  @@index([expiryDate])
+}
+
+model SupplierCapability {
+  id               String   @id @default(cuid())
+  supplierId       String
+  capabilityType   String
+  capabilityName   String
+  description      String?
+  category         String?
+  subcategory      String?
+  materials        Json?
+  processes        Json?
+  equipment        Json?
+  qualityStandards Json?
+  maxDimensions    String?
+  tolerances       String?
+  capacity         String?
+  leadTimeDays     Int?
+  notes            String?
+  status           String   @default("ACTIVE")
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([supplierId, capabilityType])
+  @@index([supplierId, status])
+}
+
+model SupplierFacility {
+  id             String   @id @default(cuid())
+  organizationId String
+  supplierId     String
+  name           String
+  type           String   @default("PLANT")
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+  latitude       Float?
+  longitude      Float?
+  areaSqFt       Float?
+  employees      Int?
+  certifications Json?
+  capabilities   Json?
+  status         String   @default("ACTIVE")
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([organizationId, type])
+  @@index([organizationId, country])
+}
+
+model SupplierRelationship {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  sourceSupplierId   String
+  targetSupplierId   String
+  relationshipType   String
+  description        String?
+  contractReference  String?
+  program            String?
+  startDate          DateTime?
+  endDate            DateTime?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceSupplier Supplier    @relation("SupplierRelSource", fields: [sourceSupplierId], references: [id], onDelete: Cascade)
+  targetSupplier Supplier    @relation("SupplierRelTarget", fields: [targetSupplierId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sourceSupplierId, targetSupplierId, relationshipType])
+  @@index([organizationId])
+  @@index([organizationId, sourceSupplierId])
+  @@index([organizationId, targetSupplierId])
+  @@index([organizationId, relationshipType])
 }

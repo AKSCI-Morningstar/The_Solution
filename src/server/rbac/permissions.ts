@@ -12,6 +12,7 @@ export const Resources = {
   ORCHESTRATOR: "orchestrator",
   REALITY: "reality",
   REPORTING: "reporting",
+  SUPPLIERS: "suppliers",
 } as const;
 
 export const Actions = {
@@ -97,6 +98,13 @@ export const Permissions = {
     execute: "reporting:execute",
     manage: "reporting:manage",
   },
+  suppliers: {
+    read: "suppliers:read",
+    create: "suppliers:create",
+    update: "suppliers:update",
+    delete: "suppliers:delete",
+    manage: "suppliers:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -143,7 +151,12 @@ export type PermissionString =
   | "reality:manage"
   | "reporting:read"
   | "reporting:execute"
-  | "reporting:manage";
+  | "reporting:manage"
+  | "suppliers:read"
+  | "suppliers:create"
+  | "suppliers:update"
+  | "suppliers:delete"
+  | "suppliers:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -190,6 +203,11 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.reporting.read,
   Permissions.reporting.execute,
   Permissions.reporting.manage,
+  Permissions.suppliers.read,
+  Permissions.suppliers.create,
+  Permissions.suppliers.update,
+  Permissions.suppliers.delete,
+  Permissions.suppliers.manage,
 ];
 
 export interface RoleDefinition {
@@ -250,6 +268,11 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.reality.read,
       Permissions.reality.execute,
       Permissions.reality.manage,
+      Permissions.suppliers.read,
+      Permissions.suppliers.create,
+      Permissions.suppliers.update,
+      Permissions.suppliers.delete,
+      Permissions.suppliers.manage,
       Permissions.reporting.read,
       Permissions.reporting.execute,
       Permissions.reporting.manage,
@@ -273,6 +296,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
       Permissions.reality.read,
+      Permissions.suppliers.read,
       Permissions.reporting.read,
     ],
   },
@@ -306,6 +330,9 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.orchestrator.execute,
       Permissions.reality.read,
       Permissions.reality.execute,
+      Permissions.suppliers.read,
+      Permissions.suppliers.create,
+      Permissions.suppliers.update,
       Permissions.reporting.read,
       Permissions.reporting.execute,
     ],
@@ -327,6 +354,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
       Permissions.reality.read,
+      Permissions.suppliers.read,
       Permissions.reporting.read,
     ],
   },
