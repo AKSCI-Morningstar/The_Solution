@@ -27,7 +27,13 @@ global.fetch = vi.fn().mockImplementation((url: string) => {
       json: () =>
         Promise.resolve({
           data: [
-            { id: "test-entity-1", name: "Subject test gear", identifier: "GEAR-001", entityType: "COMPONENT", status: "DRAFT" },
+            {
+              id: "test-entity-1",
+              name: "Subject test gear",
+              identifier: "GEAR-001",
+              entityType: "COMPONENT",
+              status: "DRAFT",
+            },
           ],
         }),
     });

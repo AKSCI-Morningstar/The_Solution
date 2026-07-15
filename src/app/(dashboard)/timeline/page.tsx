@@ -61,10 +61,13 @@ export default function EngineeringTimelinePage() {
   return (
     <PageContainer>
       <Stack gap={6}>
-        <div className="flex flex-col gap-2 border-b border-border pb-4">
-          <h1 className="text-foreground text-3xl font-bold tracking-tight">Engineering Timeline</h1>
+        <div className="border-border flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-foreground text-3xl font-bold tracking-tight">
+            Engineering Timeline
+          </h1>
           <p className="text-muted-foreground text-sm">
-            Deterministic, unified chronological log tracking every event: evidence added, rule modifications, reality assessments, approvals, and decisions.
+            Deterministic, unified chronological log tracking every event: evidence added, rule
+            modifications, reality assessments, approvals, and decisions.
           </p>
         </div>
 
@@ -109,11 +112,15 @@ export default function EngineeringTimelinePage() {
         <Section title="Engineering Event Stream">
           <Panel padding="none">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Retrieving immutable timeline events...</div>
+              <div className="text-muted-foreground p-8 text-center">
+                Retrieving immutable timeline events...
+              </div>
             ) : events.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">No matching chronological records. Try broadening your filter options.</div>
+              <div className="text-muted-foreground p-8 text-center">
+                No matching chronological records. Try broadening your filter options.
+              </div>
             ) : (
-              <Stack gap={0} className="divide-y divide-border">
+              <Stack gap={0} className="divide-border divide-y">
                 {events.map((event) => {
                   // Determine icon
                   let Icon = Clock;
@@ -123,24 +130,27 @@ export default function EngineeringTimelinePage() {
                   if (event.entity === "IngestionDocument") Icon = FileText;
 
                   return (
-                    <div key={event.id} className="flex gap-4 p-5 hover:bg-surface-hover transition-colors items-start">
-                      <div className="bg-muted p-2 rounded-md shrink-0 text-muted-foreground">
+                    <div
+                      key={event.id}
+                      className="hover:bg-surface-hover flex items-start gap-4 p-5 transition-colors"
+                    >
+                      <div className="bg-muted text-muted-foreground shrink-0 rounded-md p-2">
                         <Icon className="size-4" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between md:gap-0">
-                          <span className="text-sm font-bold text-foreground capitalize">
+                          <span className="text-foreground text-sm font-bold capitalize">
                             {event.action.replaceAll("_", " ").toLowerCase()}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             {new Date(event.createdAt).toLocaleString()}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground font-mono mt-1">
+                        <p className="text-muted-foreground mt-1 font-mono text-xs">
                           Entity Type: {event.entity} · Identifier: {event.entityId}
                         </p>
                         {event.metadata && Object.keys(event.metadata).length > 0 && (
-                          <div className="mt-2 bg-muted p-2 rounded text-[11px] font-mono text-muted-foreground overflow-x-auto">
+                          <div className="bg-muted text-muted-foreground mt-2 overflow-x-auto rounded p-2 font-mono text-[11px]">
                             {JSON.stringify(event.metadata)}
                           </div>
                         )}
@@ -152,8 +162,10 @@ export default function EngineeringTimelinePage() {
             )}
           </Panel>
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-xs text-muted-foreground">{total} total chronological entries logged</span>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-muted-foreground text-xs">
+                {total} total chronological entries logged
+              </span>
               <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
           )}

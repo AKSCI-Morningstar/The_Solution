@@ -63,10 +63,13 @@ export default function TraceabilityMatrixPage() {
   return (
     <PageContainer>
       <Stack gap={6}>
-        <div className="flex flex-col gap-2 border-b border-border pb-4">
-          <h1 className="text-foreground text-3xl font-bold tracking-tight">Enterprise Traceability Matrix</h1>
+        <div className="border-border flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-foreground text-3xl font-bold tracking-tight">
+            Enterprise Traceability Matrix
+          </h1>
           <p className="text-muted-foreground text-sm">
-            End-to-end multi-tier lineage tracking from high-level Requirements to persisted Audit Logs and Engineering Memory.
+            End-to-end multi-tier lineage tracking from high-level Requirements to persisted Audit
+            Logs and Engineering Memory.
           </p>
         </div>
 
@@ -75,11 +78,13 @@ export default function TraceabilityMatrixPage() {
           <Panel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex-1">
-                <label className="text-foreground text-sm font-semibold mb-1.5 block">Active Engineering Object</label>
+                <label className="text-foreground mb-1.5 block text-sm font-semibold">
+                  Active Engineering Object
+                </label>
                 <select
                   value={selectedEntityId}
                   onChange={(e) => setSelectedEntityId(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background p-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="border-border bg-background text-foreground focus:border-primary focus:ring-primary w-full rounded-md border p-2.5 text-sm focus:ring-1"
                 >
                   <option value="">-- Choose Subject Entity --</option>
                   {entities.map((e) => (
@@ -101,106 +106,124 @@ export default function TraceabilityMatrixPage() {
           <Section title="Interactive Multi-Tier Trace Map">
             <Stack gap={4}>
               {traceRecords.map((record, index) => (
-                <Panel key={index} className="relative overflow-hidden border-l-4 border-l-success">
+                <Panel key={index} className="border-l-success relative overflow-hidden border-l-4">
                   {/* Digital Thread Visualization Flow */}
                   <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between border-b border-border pb-2">
+                    <div className="border-border flex items-center justify-between border-b pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="bg-success/15 text-success-foreground text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                        <span className="bg-success/15 text-success-foreground rounded-full px-2.5 py-0.5 text-xs font-semibold">
                           Tier Lineage #{index + 1}
                         </span>
-                        <span className="text-xs text-muted-foreground">Deterministic chain</span>
+                        <span className="text-muted-foreground text-xs">Deterministic chain</span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-mono">Status: {record.entityStatus}</span>
+                      <span className="text-muted-foreground font-mono text-xs">
+                        Status: {record.entityStatus}
+                      </span>
                     </div>
 
                     {/* Flow steps with connector icons */}
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-5 xl:grid-cols-10 items-start">
+                    <div className="grid grid-cols-2 items-start gap-4 md:grid-cols-5 xl:grid-cols-10">
                       {/* 1. Requirement */}
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                          <BookCheck className="size-3.5 text-primary" />
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase">
+                          <BookCheck className="text-primary size-3.5" />
                           <span>Requirement</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium truncate">REQ-{record.entityIdentifier}</span>
-                        <span className="text-xs text-muted-foreground">VER-1.2.0</span>
+                        <span className="text-foreground truncate text-sm font-medium">
+                          REQ-{record.entityIdentifier}
+                        </span>
+                        <span className="text-muted-foreground text-xs">VER-1.2.0</span>
                       </div>
 
                       {/* Connector */}
-                      <div className="hidden xl:flex items-center justify-center pt-4">
-                        <ArrowRight className="size-4 text-muted-foreground/40" />
+                      <div className="hidden items-center justify-center pt-4 xl:flex">
+                        <ArrowRight className="text-muted-foreground/40 size-4" />
                       </div>
 
                       {/* 2. Evidence */}
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                          <Database className="size-3.5 text-warning" />
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase">
+                          <Database className="text-warning size-3.5" />
                           <span>Evidence</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium truncate">
+                        <span className="text-foreground truncate text-sm font-medium">
                           {record.documentName ?? "Local Assertion"}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {record.documentId ? `Doc ID: ${record.documentId.slice(0, 6)}...` : "Manual Entry"}
+                        <span className="text-muted-foreground text-xs">
+                          {record.documentId
+                            ? `Doc ID: ${record.documentId.slice(0, 6)}...`
+                            : "Manual Entry"}
                         </span>
                       </div>
 
                       {/* Connector */}
-                      <div className="hidden xl:flex items-center justify-center pt-4">
-                        <ArrowRight className="size-4 text-muted-foreground/40" />
+                      <div className="hidden items-center justify-center pt-4 xl:flex">
+                        <ArrowRight className="text-muted-foreground/40 size-4" />
                       </div>
 
                       {/* 3. Rule Evaluation */}
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                          <ShieldCheck className="size-3.5 text-success" />
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase">
+                          <ShieldCheck className="text-success size-3.5" />
                           <span>Rule Engine</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium truncate">VAL-RULE-ENG</span>
-                        <span className="text-xs text-muted-foreground">Outcome: Verified</span>
+                        <span className="text-foreground truncate text-sm font-medium">
+                          VAL-RULE-ENG
+                        </span>
+                        <span className="text-muted-foreground text-xs">Outcome: Verified</span>
                       </div>
 
                       {/* Connector */}
-                      <div className="hidden xl:flex items-center justify-center pt-4">
-                        <ArrowRight className="size-4 text-muted-foreground/40" />
+                      <div className="hidden items-center justify-center pt-4 xl:flex">
+                        <ArrowRight className="text-muted-foreground/40 size-4" />
                       </div>
 
                       {/* 4. Reality Assessment / Decision */}
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                          <CheckCircle className="size-3.5 text-info" />
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase">
+                          <CheckCircle className="text-info size-3.5" />
                           <span>Decision</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium truncate">REALITY-ASSESS</span>
-                        <span className="text-xs text-muted-foreground">Confidence: 94.2%</span>
+                        <span className="text-foreground truncate text-sm font-medium">
+                          REALITY-ASSESS
+                        </span>
+                        <span className="text-muted-foreground text-xs">Confidence: 94.2%</span>
                       </div>
 
                       {/* Connector */}
-                      <div className="hidden xl:flex items-center justify-center pt-4">
-                        <ArrowRight className="size-4 text-muted-foreground/40" />
+                      <div className="hidden items-center justify-center pt-4 xl:flex">
+                        <ArrowRight className="text-muted-foreground/40 size-4" />
                       </div>
 
                       {/* 5. Memory & Audit Log */}
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                          <Database className="size-3.5 text-muted-foreground" />
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold uppercase">
+                          <Database className="text-muted-foreground size-3.5" />
                           <span>Audit & Memory</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium truncate">AUDIT-EVENT-LOG</span>
-                        <span className="text-xs text-muted-foreground">Immutable Entry</span>
+                        <span className="text-foreground truncate text-sm font-medium">
+                          AUDIT-EVENT-LOG
+                        </span>
+                        <span className="text-muted-foreground text-xs">Immutable Entry</span>
                       </div>
                     </div>
 
                     {/* Path reconstruction details */}
                     {record.relationshipPath.length > 0 && (
-                      <div className="mt-2 bg-muted p-3 rounded-md border border-border">
-                        <span className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-1">Knowledge Graph Path Traversal</span>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-mono">
-                          <span className="bg-background px-2 py-0.5 rounded border border-border text-foreground font-semibold">ROOT: {record.entityName}</span>
+                      <div className="bg-muted border-border mt-2 rounded-md border p-3">
+                        <span className="text-foreground mb-1 block text-xs font-semibold tracking-wider uppercase">
+                          Knowledge Graph Path Traversal
+                        </span>
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-2 font-mono text-xs">
+                          <span className="bg-background border-border text-foreground rounded border px-2 py-0.5 font-semibold">
+                            ROOT: {record.entityName}
+                          </span>
                           {record.relationshipPath.map((pathStep, sIdx) => (
                             <div key={sIdx} className="flex items-center gap-2">
                               <ArrowRight className="size-3" />
-                              <span className="bg-background px-2 py-0.5 rounded border border-border">{pathStep}</span>
+                              <span className="bg-background border-border rounded border px-2 py-0.5">
+                                {pathStep}
+                              </span>
                             </div>
                           ))}
                         </div>

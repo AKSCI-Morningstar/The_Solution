@@ -25,7 +25,9 @@ export default function InvestigationWorkspacePage() {
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"timeline" | "contradictions" | "rootcause">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "contradictions" | "rootcause">(
+    "timeline",
+  );
 
   useEffect(() => {
     fetch("/api/engineering/entities?limit=100")
@@ -66,10 +68,13 @@ export default function InvestigationWorkspacePage() {
   return (
     <PageContainer>
       <Stack gap={6}>
-        <div className="flex flex-col gap-2 border-b border-border pb-4">
-          <h1 className="text-foreground text-3xl font-bold tracking-tight">Engineering Investigation Workspace</h1>
+        <div className="border-border flex flex-col gap-2 border-b pb-4">
+          <h1 className="text-foreground text-3xl font-bold tracking-tight">
+            Engineering Investigation Workspace
+          </h1>
           <p className="text-muted-foreground text-sm">
-            Root-cause analysis workspace. Reconstruct item modification histories, rules compliance, and contradictions.
+            Root-cause analysis workspace. Reconstruct item modification histories, rules
+            compliance, and contradictions.
           </p>
         </div>
 
@@ -78,11 +83,13 @@ export default function InvestigationWorkspacePage() {
           <Panel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex-1">
-                <label className="text-foreground text-sm font-semibold mb-1.5 block">Active Engineering Object</label>
+                <label className="text-foreground mb-1.5 block text-sm font-semibold">
+                  Active Engineering Object
+                </label>
                 <select
                   value={selectedEntityId}
                   onChange={(e) => setSelectedEntityId(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background p-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="border-border bg-background text-foreground focus:border-primary focus:ring-primary w-full rounded-md border p-2.5 text-sm focus:ring-1"
                 >
                   <option value="">-- Choose Subject Entity --</option>
                   {entities.map((e) => (
@@ -103,27 +110,33 @@ export default function InvestigationWorkspacePage() {
         {selectedEntity && (
           <div className="flex flex-col gap-6">
             {/* Tabs */}
-            <div className="flex border-b border-border">
+            <div className="border-border flex border-b">
               <button
                 onClick={() => setActiveTab("timeline")}
-                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  activeTab === "timeline" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "timeline"
+                    ? "border-primary text-primary"
+                    : "text-muted-foreground hover:text-foreground border-transparent"
                 }`}
               >
                 Timeline Reconstruction
               </button>
               <button
                 onClick={() => setActiveTab("contradictions")}
-                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  activeTab === "contradictions" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "contradictions"
+                    ? "border-primary text-primary"
+                    : "text-muted-foreground hover:text-foreground border-transparent"
                 }`}
               >
                 Contradiction Analysis
               </button>
               <button
                 onClick={() => setActiveTab("rootcause")}
-                className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  activeTab === "rootcause" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "rootcause"
+                    ? "border-primary text-primary"
+                    : "text-muted-foreground hover:text-foreground border-transparent"
                 }`}
               >
                 Root Cause & Precedents
@@ -137,22 +150,29 @@ export default function InvestigationWorkspacePage() {
                   {isLoading ? (
                     <p className="text-muted-foreground text-sm">Loading version timeline...</p>
                   ) : versions.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No recorded modifications or versions for this engineering entity.</p>
+                    <p className="text-muted-foreground text-sm">
+                      No recorded modifications or versions for this engineering entity.
+                    </p>
                   ) : (
-                    <div className="relative border-l border-border ml-3 pl-6 flex flex-col gap-6">
+                    <div className="border-border relative ml-3 flex flex-col gap-6 border-l pl-6">
                       {versions.map((v) => (
                         <div key={v.id} className="relative">
                           {/* Dot indicator */}
-                          <div className="absolute -left-[31px] top-1 bg-background border border-border rounded-full size-4 flex items-center justify-center">
-                            <div className="size-2 rounded-full bg-primary" />
+                          <div className="bg-background border-border absolute top-1 -left-[31px] flex size-4 items-center justify-center rounded-full border">
+                            <div className="bg-primary size-2 rounded-full" />
                           </div>
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-foreground">Version {v.version}</span>
-                              <span className="text-xs text-muted-foreground">{new Date(v.createdAt).toLocaleString()}</span>
+                              <span className="text-foreground text-sm font-bold">
+                                Version {v.version}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {new Date(v.createdAt).toLocaleString()}
+                              </span>
                             </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                              {v.changeDescription ?? "Initial baseline creation of the subject entity."}
+                            <p className="text-muted-foreground text-sm leading-relaxed">
+                              {v.changeDescription ??
+                                "Initial baseline creation of the subject entity."}
                             </p>
                           </div>
                         </div>
@@ -167,17 +187,22 @@ export default function InvestigationWorkspacePage() {
               <Section title="Active Conflict & Contradiction Traces">
                 <Panel>
                   <div className="flex flex-col gap-4">
-                    <div className="bg-destructive/15 border border-destructive/20 rounded-md p-4 flex gap-3 items-start">
-                      <AlertTriangle className="size-5 text-destructive shrink-0 mt-0.5" />
+                    <div className="bg-destructive/15 border-destructive/20 flex items-start gap-3 rounded-md border p-4">
+                      <AlertTriangle className="text-destructive mt-0.5 size-5 shrink-0" />
                       <div>
-                        <h4 className="text-sm font-bold text-foreground">Deterministic Structural Inconsistency Trace</h4>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                          The rule validator engine has compared this object with Mil-STD certifications. No active contradiction has been promoted to REJECTED.
+                        <h4 className="text-foreground text-sm font-bold">
+                          Deterministic Structural Inconsistency Trace
+                        </h4>
+                        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                          The rule validator engine has compared this object with Mil-STD
+                          certifications. No active contradiction has been promoted to REJECTED.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      Every contradiction is resolved synchronously through the Contradiction Resolution Service. There are currently no conflicting evidence blocks matched with the subject entity identifier.
+                    <p className="text-foreground text-sm leading-relaxed">
+                      Every contradiction is resolved synchronously through the Contradiction
+                      Resolution Service. There are currently no conflicting evidence blocks matched
+                      with the subject entity identifier.
                     </p>
                   </div>
                 </Panel>
@@ -189,33 +214,45 @@ export default function InvestigationWorkspacePage() {
                 <Panel>
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Root Cause Visual Map</span>
-                      <p className="text-sm text-foreground mt-1">
-                        Active entity dependencies are traced through outgoing knowledge graph relationships.
+                      <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                        Root Cause Visual Map
+                      </span>
+                      <p className="text-foreground mt-1 text-sm">
+                        Active entity dependencies are traced through outgoing knowledge graph
+                        relationships.
                       </p>
                     </div>
 
-                    <div className="bg-muted border border-border p-4 rounded-lg">
+                    <div className="bg-muted border-border rounded-lg border p-4">
                       <div className="flex flex-col gap-4">
                         <div className="flex items-center gap-3">
-                          <CheckCircle className="size-4 text-success" />
-                          <span className="text-sm font-semibold text-foreground">Rule engine verification validation successful</span>
+                          <CheckCircle className="text-success size-4" />
+                          <span className="text-foreground text-sm font-semibold">
+                            Rule engine verification validation successful
+                          </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <CheckCircle className="size-4 text-success" />
-                          <span className="text-sm font-semibold text-foreground">Supporting technical documents extraction: APPROVED (100% confidence)</span>
+                          <CheckCircle className="text-success size-4" />
+                          <span className="text-foreground text-sm font-semibold">
+                            Supporting technical documents extraction: APPROVED (100% confidence)
+                          </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <CheckCircle className="size-4 text-success" />
-                          <span className="text-sm font-semibold text-foreground">Supplier facility audit status: verified (ACTIVE)</span>
+                          <CheckCircle className="text-success size-4" />
+                          <span className="text-foreground text-sm font-semibold">
+                            Supplier facility audit status: verified (ACTIVE)
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Historical Qualified Precedents</span>
-                      <p className="text-sm text-foreground mt-1">
-                        Precedents provide deterministic reference points without probabilistic guesses.
+                      <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                        Historical Qualified Precedents
+                      </span>
+                      <p className="text-foreground mt-1 text-sm">
+                        Precedents provide deterministic reference points without probabilistic
+                        guesses.
                       </p>
                     </div>
                   </div>

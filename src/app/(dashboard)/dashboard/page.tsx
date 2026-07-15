@@ -63,12 +63,42 @@ interface OrgSummary {
 }
 
 const EEOS_WORKSPACES = [
-  { label: "Engineering Timeline", href: "/timeline", icon: Clock, desc: "Search and filter all platform events." },
-  { label: "Decision Workspace", href: "/reality/compare", icon: Scale, desc: "Deterministic trade-off comparison." },
-  { label: "Traceability Matrix", href: "/evidence/traceability", icon: GitBranch, desc: "Interactive end-to-end trace mapping." },
-  { label: "Observability Platform", href: "/orchestrator/observability", icon: ActivitySquare, desc: "Pipeline latency and validation errors." },
-  { label: "Investigation Hub", href: "/investigation", icon: Shield, desc: "Timeline reconstruction and root causes." },
-  { label: "Knowledge Graph", href: "/knowledge-graph", icon: Server, desc: "Visual and indexed entity relationships." },
+  {
+    label: "Engineering Timeline",
+    href: "/timeline",
+    icon: Clock,
+    desc: "Search and filter all platform events.",
+  },
+  {
+    label: "Decision Workspace",
+    href: "/reality/compare",
+    icon: Scale,
+    desc: "Deterministic trade-off comparison.",
+  },
+  {
+    label: "Traceability Matrix",
+    href: "/evidence/traceability",
+    icon: GitBranch,
+    desc: "Interactive end-to-end trace mapping.",
+  },
+  {
+    label: "Observability Platform",
+    href: "/orchestrator/observability",
+    icon: ActivitySquare,
+    desc: "Pipeline latency and validation errors.",
+  },
+  {
+    label: "Investigation Hub",
+    href: "/investigation",
+    icon: Shield,
+    desc: "Timeline reconstruction and root causes.",
+  },
+  {
+    label: "Knowledge Graph",
+    href: "/knowledge-graph",
+    icon: Server,
+    desc: "Visual and indexed entity relationships.",
+  },
 ];
 
 function timeAgo(iso: string): string {
@@ -139,7 +169,11 @@ export default function DashboardPage() {
   // Compute Platform KPIs and Health metrics deterministically
   const platformHealth = "99.8%";
   const confidenceScore = "94.2%";
-  const totalContradictions = orgSummary?.totalContradictions ?? activity.filter(a => a.description.toLowerCase().includes("contradiction") || a.type === "contradiction").length;
+  const totalContradictions =
+    orgSummary?.totalContradictions ??
+    activity.filter(
+      (a) => a.description.toLowerCase().includes("contradiction") || a.type === "contradiction",
+    ).length;
   const activeContradictions = totalContradictions;
   const supplierRiskLevel = "Low";
 
@@ -147,15 +181,18 @@ export default function DashboardPage() {
     <PageContainer>
       <Stack gap={8}>
         {/* Page Title & Operational Mode */}
-        <div className="flex flex-col gap-2 border-b border-border pb-4 md:flex-row md:items-center md:justify-between md:gap-0">
+        <div className="border-border flex flex-col gap-2 border-b pb-4 md:flex-row md:items-center md:justify-between md:gap-0">
           <div>
-            <h1 className="text-foreground text-3xl font-bold tracking-tight">Engineering Command Center</h1>
+            <h1 className="text-foreground text-3xl font-bold tracking-tight">
+              Engineering Command Center
+            </h1>
             <p className="text-muted-foreground text-sm">
-              AKSCI Operating System: deterministic, evidence-backed engineering control and status panel.
+              AKSCI Operating System: deterministic, evidence-backed engineering control and status
+              panel.
             </p>
           </div>
-          <div className="bg-success/15 border-success/30 flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold text-success-foreground">
-            <Heart className="size-3.5 fill-current animate-pulse text-success" />
+          <div className="bg-success/15 border-success/30 text-success-foreground flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold">
+            <Heart className="text-success size-3.5 animate-pulse fill-current" />
             <span>Operational Reality Layer Connected</span>
           </div>
         </div>
@@ -166,22 +203,22 @@ export default function DashboardPage() {
             <MetricCard
               label="Engineering Confidence"
               value={confidenceScore}
-              icon={<Shield className="size-5 text-primary" />}
+              icon={<Shield className="text-primary size-5" />}
             />
             <MetricCard
               label="Platform Core Health"
               value={platformHealth}
-              icon={<Zap className="size-5 text-warning" />}
+              icon={<Zap className="text-warning size-5" />}
             />
             <MetricCard
               label="Active Contradictions"
               value={activeContradictions > 0 ? activeContradictions.toString() : "0"}
-              icon={<AlertTriangle className="size-5 text-destructive" />}
+              icon={<AlertTriangle className="text-destructive size-5" />}
             />
             <MetricCard
               label="Supplier Risk Level"
               value={supplierRiskLevel}
-              icon={<Building className="size-5 text-success" />}
+              icon={<Building className="text-success size-5" />}
             />
           </GridLayout>
         </Section>
@@ -202,12 +239,16 @@ export default function DashboardPage() {
                   <div className="bg-muted text-muted-foreground group-hover:text-primary flex size-10 shrink-0 items-center justify-center rounded-md transition-colors">
                     <workspace.icon className="size-5" />
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-foreground text-sm font-semibold tracking-tight">{workspace.label}</span>
-                    <span className="text-muted-foreground text-xs mt-1 leading-relaxed">{workspace.desc}</span>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-foreground text-sm font-semibold tracking-tight">
+                      {workspace.label}
+                    </span>
+                    <span className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                      {workspace.desc}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-end mt-4 text-xs font-medium text-primary opacity-60 group-hover:opacity-100 transition-opacity">
+                <div className="text-primary mt-4 flex items-center justify-end text-xs font-medium opacity-60 transition-opacity group-hover:opacity-100">
                   <span>Enter Workspace</span>
                   <ArrowRight className="ml-1 size-3.5 transition-transform group-hover:translate-x-0.5" />
                 </div>
@@ -273,12 +314,14 @@ export default function DashboardPage() {
                           {doc.fileExtension.toUpperCase()} · {timeAgo(doc.createdAt)}
                         </span>
                       </div>
-                      <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-full font-medium",
-                        doc.status === "COMPLETED" || doc.status === "CONFIRMED"
-                          ? "bg-success/10 text-success"
-                          : "bg-warning/10 text-warning"
-                      )}>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          doc.status === "COMPLETED" || doc.status === "CONFIRMED"
+                            ? "bg-success/10 text-success"
+                            : "bg-warning/10 text-warning",
+                        )}
+                      >
                         {doc.status}
                       </span>
                     </Link>

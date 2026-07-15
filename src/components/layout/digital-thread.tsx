@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Link2, FileText, BookCheck, CheckCircle, Database, Building, HelpCircle } from "lucide-react";
+import {
+  Link2,
+  FileText,
+  BookCheck,
+  CheckCircle,
+  Database,
+  Building,
+  HelpCircle,
+} from "lucide-react";
 import { cn } from "@/shared/utils";
 
 interface ThreadItem {
@@ -34,13 +42,48 @@ export function DigitalThread({ entityId, className }: DigitalThreadProps) {
         if (records.length > 0) {
           const rec = records[0];
           const items: ThreadItem[] = [
-            { type: "Requirement", label: `REQ-${rec.entityIdentifier}`, status: "VERIFIED", details: `Linked to entity ${rec.entityName}` },
-            { type: "Evidence", label: rec.documentName ?? "Local Assertion", status: rec.documentId ? "CONFIRMED" : "MANUAL", details: rec.documentId ? `Doc ID: ${rec.documentId.slice(0, 8)}` : "Manual assert" },
-            { type: "Rule Engine", label: "VAL-RULE-ENG", status: "VERIFIED", details: "Evaluating Mil-STD compliance deterministically" },
-            { type: "Decision Trace", label: "REALITY-ASSESS", status: "VERIFIED", details: "Active reality confidence calculated at 94.2%" },
-            { type: "Supplier Info", label: "Aerospace Approved Vendor", status: "ACTIVE", details: "Tier-1 supplier facility status checked" },
-            { type: "Audit Event", label: "AUDIT-EVENT-LOG", status: "IMMUTABLE", details: "Lineage entry stored securely in audit log" },
-            { type: "Memory", label: "EEOS Persistent State", status: "SAVED", details: "Subsystem state stored in Engineering Memory" },
+            {
+              type: "Requirement",
+              label: `REQ-${rec.entityIdentifier}`,
+              status: "VERIFIED",
+              details: `Linked to entity ${rec.entityName}`,
+            },
+            {
+              type: "Evidence",
+              label: rec.documentName ?? "Local Assertion",
+              status: rec.documentId ? "CONFIRMED" : "MANUAL",
+              details: rec.documentId ? `Doc ID: ${rec.documentId.slice(0, 8)}` : "Manual assert",
+            },
+            {
+              type: "Rule Engine",
+              label: "VAL-RULE-ENG",
+              status: "VERIFIED",
+              details: "Evaluating Mil-STD compliance deterministically",
+            },
+            {
+              type: "Decision Trace",
+              label: "REALITY-ASSESS",
+              status: "VERIFIED",
+              details: "Active reality confidence calculated at 94.2%",
+            },
+            {
+              type: "Supplier Info",
+              label: "Aerospace Approved Vendor",
+              status: "ACTIVE",
+              details: "Tier-1 supplier facility status checked",
+            },
+            {
+              type: "Audit Event",
+              label: "AUDIT-EVENT-LOG",
+              status: "IMMUTABLE",
+              details: "Lineage entry stored securely in audit log",
+            },
+            {
+              type: "Memory",
+              label: "EEOS Persistent State",
+              status: "SAVED",
+              details: "Subsystem state stored in Engineering Memory",
+            },
           ];
           setThreadItems(items);
         } else {
@@ -61,23 +104,30 @@ export function DigitalThread({ entityId, className }: DigitalThreadProps) {
 
   if (!entityId) {
     return (
-      <div className={cn("p-4 text-center text-muted-foreground text-xs", className)}>
+      <div className={cn("text-muted-foreground p-4 text-center text-xs", className)}>
         Select an engineering subject to track its deterministic Digital Thread.
       </div>
     );
   }
 
   return (
-    <div className={cn("flex flex-col gap-4 border border-border rounded-lg bg-background p-4", className)}>
-      <div className="flex items-center gap-2 border-b border-border pb-2">
-        <Link2 className="size-4 text-primary animate-pulse" />
-        <span className="text-sm font-bold text-foreground">Active Digital Thread Trace</span>
+    <div
+      className={cn(
+        "border-border bg-background flex flex-col gap-4 rounded-lg border p-4",
+        className,
+      )}
+    >
+      <div className="border-border flex items-center gap-2 border-b pb-2">
+        <Link2 className="text-primary size-4 animate-pulse" />
+        <span className="text-foreground text-sm font-bold">Active Digital Thread Trace</span>
       </div>
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Tracing thread links...</p>
+        <p className="text-muted-foreground text-xs">Tracing thread links...</p>
       ) : threadItems.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No Digital Thread records active for this entity.</p>
+        <p className="text-muted-foreground text-xs">
+          No Digital Thread records active for this entity.
+        </p>
       ) : (
         <div className="flex flex-col gap-3">
           {threadItems.map((item, index) => {
@@ -91,18 +141,20 @@ export function DigitalThread({ entityId, className }: DigitalThreadProps) {
             if (item.type === "Memory") Icon = Database;
 
             return (
-              <div key={index} className="flex gap-2.5 items-start">
-                <div className="bg-muted p-1.5 rounded text-muted-foreground mt-0.5 shrink-0">
+              <div key={index} className="flex items-start gap-2.5">
+                <div className="bg-muted text-muted-foreground mt-0.5 shrink-0 rounded p-1.5">
                   <Icon className="size-3.5" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-xs font-bold text-foreground truncate">{item.label}</span>
-                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-semibold">
+                    <span className="text-foreground truncate text-xs font-bold">{item.label}</span>
+                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-semibold">
                       {item.type}
                     </span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{item.details}</p>
+                  <p className="text-muted-foreground mt-0.5 text-[11px] leading-relaxed">
+                    {item.details}
+                  </p>
                 </div>
               </div>
             );
