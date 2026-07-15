@@ -1,5 +1,6 @@
 import { prisma } from "@/server/db";
 import { NotFoundError } from "@/shared/errors";
+import { recordAuditEvent } from "@/server/audit/audit-service";
 import type { CreateContactInput } from "./validation";
 
 export async function createContact(
@@ -19,7 +20,7 @@ export async function createContact(
     });
   }
 
-  return prisma.supplierContact.create({
+  const contact = await prisma.supplierContact.create({
     data: {
       supplierId,
       name: input.name,
@@ -32,6 +33,19 @@ export async function createContact(
       notes: input.notes,
     },
   });
+
+  await recordAuditEvent(
+    organizationId,
+    "supplier_contact.created",
+    "SupplierContact",
+    contact.id,
+    {
+      supplierId,
+      name: input.name,
+    },
+  );
+
+  return contact;
 }
 
 export async function getContacts(supplierId: string, organizationId: string) {
@@ -69,10 +83,17 @@ export async function updateContact(
     });
   }
 
-  return prisma.supplierContact.update({
+  const updated = await prisma.supplierContact.update({
     where: { id: contactId },
     data: input,
   });
+
+  await recordAuditEvent(organizationId, "supplier_contact.updated", "SupplierContact", contactId, {
+    supplierId,
+    changes: Object.keys(input),
+  });
+
+  return updated;
 }
 
 export async function deleteContact(contactId: string, supplierId: string, organizationId: string) {
@@ -87,4 +108,9 @@ export async function deleteContact(contactId: string, supplierId: string, organ
   if (!contact) throw new NotFoundError("SupplierContact", contactId);
 
   await prisma.supplierContact.delete({ where: { id: contactId } });
+
+  await recordAuditEvent(organizationId, "supplier_contact.deleted", "SupplierContact", contactId, {
+    supplierId,
+    name: contact.name,
+  });
 }
