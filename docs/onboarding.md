@@ -117,10 +117,9 @@ type User = z.infer<typeof userSchema>;
 // In API route:
 const data = userSchema.safeParse(request.body);
 if (!data.success) {
-  return NextResponse.json(
-    new ValidationError(data.error.flatten().fieldErrors).toJSON(),
-    { status: 400 },
-  );
+  return NextResponse.json(new ValidationError(data.error.flatten().fieldErrors).toJSON(), {
+    status: 400,
+  });
 }
 ```
 
@@ -168,10 +167,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ok, err, NotFoundError } from "@/lib";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     // Your logic here
     const user = await db.user.findUnique({ where: { id: params.id } });
