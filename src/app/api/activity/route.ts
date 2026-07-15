@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/server/db";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { requirePermission } from "@/server/rbac";
@@ -20,8 +21,9 @@ interface ActivityItem {
   actor?: string;
 }
 
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
+const activityQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 export async function GET(request: Request) {
   try {
@@ -36,11 +38,19 @@ export async function GET(request: Request) {
     await requirePermission(orgId, user.id, "organization:read");
 
     const url = new URL(request.url);
-    const limit = Math.min(
-      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT)),
-      MAX_LIMIT,
-    );
+    const parsed = activityQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          code: "VALIDATION_ERROR",
+          details: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 },
+      );
+    }
 
+    const { limit } = parsed.data;
     const perSource = Math.ceil(limit / 3);
 
     const [recentEntities, recentDocuments, recentJobs, recentRelationships] = await Promise.all([
@@ -73,7 +83,7 @@ export async function GET(request: Request) {
       prisma.ingestionJob.findMany({
         where: {
           organizationId: orgId,
-          status: { in: ["COMPLETED", "FAILED"] },
+          status: { in: ["COMPLETED", "FAILED", "SUCCEEDED"] },
         },
         orderBy: { completedAt: "desc" },
         take: perSource,
@@ -158,6 +168,9 @@ export async function GET(request: Request) {
         { status: error.statusCode },
       );
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
+      { status: 500 },
+    );
   }
 }

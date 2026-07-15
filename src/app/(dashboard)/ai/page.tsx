@@ -1,13 +1,42 @@
-import { PagePlaceholder } from "../_components/page-placeholder";
+"use client";
 
-export default function AIWorkspacePage() {
+import { Brain } from "lucide-react";
+import { CapabilityHub } from "@/components/layout/capability-hub";
+
+export default function AiWorkspacePage() {
   return (
-    <PagePlaceholder
-      meta={{
-        title: "AI Workspace",
-        description: "AI-assisted engineering verification and analysis tools.",
-        breadcrumbs: [{ label: "Dashboard", href: "/dashboard" }, { label: "AI Workspace" }],
-      }}
+    <CapabilityHub
+      title="AI Workspace"
+      description="Deterministic intelligence on this platform is delivered through search, knowledge graph exploration, contradiction detection, and reasoning orchestration—not free-form generation."
+      status="integrated"
+      statusLabel="Deterministic intelligence surface"
+      icon={Brain}
+      links={[
+        {
+          label: "Workspace Search",
+          href: "/search",
+          description: "Cross-entity search with command palette access (⌘K).",
+        },
+        {
+          label: "Knowledge Graph",
+          href: "/knowledge-graph",
+          description: "Navigate provenanced engineering relationships visually.",
+        },
+        {
+          label: "Contradictions",
+          href: "/contradictions",
+          description: "Detect and resolve conflicting engineering assertions.",
+        },
+        {
+          label: "Orchestrator",
+          href: "/orchestrator",
+          description: "Run structured multi-stage reasoning with explainable logs.",
+        },
+      ]}
+      notes={[
+        "Generative AI chat is intentionally deferred to preserve deterministic engineering principles.",
+        "Existing engines already provide evidence-backed recommendations and assessments.",
+      ]}
     />
   );
 }

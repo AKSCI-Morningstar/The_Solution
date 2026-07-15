@@ -9,3 +9,5 @@ export { Stack } from "./stack";
 export { GridLayout } from "./grid-layout";
 export { SplitLayout } from "./split-layout";
 export { Breadcrumbs } from "./breadcrumbs";
+export { CapabilityHub } from "./capability-hub";
+export type { CapabilityHubProps, CapabilityLink } from "./capability-hub";

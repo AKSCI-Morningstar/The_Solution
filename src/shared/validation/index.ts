@@ -1,2 +1,8 @@
-export { paginationSchema, dateRangeSchema, searchSchema, idSchema } from "./schemas";
-export type { PaginationInput, DateRange, SearchInput } from "./schemas";
+export {
+  paginationSchema,
+  dateRangeSchema,
+  searchSchema,
+  searchQuerySchema,
+  idSchema,
+} from "./schemas";
+export type { PaginationInput, DateRange, SearchInput, SearchQueryInput } from "./schemas";

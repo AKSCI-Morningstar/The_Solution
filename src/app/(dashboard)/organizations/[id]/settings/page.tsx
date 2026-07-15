@@ -79,7 +79,13 @@ export default function OrganizationSettingsPage() {
     );
   }
 
-  if (!org) return null;
+  if (!org) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <p className="text-muted-foreground text-sm">Organization not found or inaccessible.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-8">

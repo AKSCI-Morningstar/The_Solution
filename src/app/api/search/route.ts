@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/server/db";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { validateSession } from "@/server/auth/session-service";
@@ -15,8 +16,12 @@ interface SearchResult {
   icon: "Tags" | "FileText" | "Building2" | "Hash";
 }
 
-const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 25;
+const searchQuerySchema = z.object({
+  q: z.string().trim().max(500).default(""),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  type: z.enum(["entity", "document", "organization", "user"]).optional(),
+});
+
 const MIN_QUERY_LENGTH = 2;
 
 export async function GET(request: Request) {
@@ -32,68 +37,87 @@ export async function GET(request: Request) {
     await requirePermission(orgId, session.userId, "organization:read");
 
     const url = new URL(request.url);
-    const q = (url.searchParams.get("q") ?? "").trim();
-    const limit = Math.min(
-      Math.max(1, Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT)),
-      MAX_LIMIT,
-    );
+    const parsed = searchQuerySchema.safeParse(Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          code: "VALIDATION_ERROR",
+          details: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 },
+      );
+    }
+
+    const { q, limit, type } = parsed.data;
 
     if (q.length < MIN_QUERY_LENGTH) {
       return NextResponse.json({ data: [] });
     }
 
-    const perType = Math.ceil(limit / 4);
+    const typeCount = type ? 1 : 4;
+    const perType = Math.ceil(limit / typeCount);
     const results: SearchResult[] = [];
 
+    const shouldSearch = (candidate: SearchResult["type"]) => !type || type === candidate;
+
     const [entities, documents, organizations, users] = await Promise.all([
-      prisma.engineeringEntity.findMany({
-        where: {
-          organizationId: orgId,
-          deletedAt: null,
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { identifier: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-          ],
-        },
-        take: perType,
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, name: true, identifier: true, entityType: true },
-      }),
-      prisma.ingestionDocument.findMany({
-        where: {
-          organizationId: orgId,
-          deletedAt: null,
-          fileName: { contains: q, mode: "insensitive" },
-        },
-        take: perType,
-        orderBy: { updatedAt: "desc" },
-        select: { id: true, fileName: true, fileExtension: true },
-      }),
-      prisma.organization.findMany({
-        where: {
-          members: { some: { userId: session.userId, status: "active" } },
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { slug: { contains: q, mode: "insensitive" } },
-          ],
-        },
-        take: perType,
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, slug: true },
-      }),
-      prisma.user.findMany({
-        where: {
-          memberships: { some: { organizationId: orgId, status: "active" } },
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-          ],
-        },
-        take: perType,
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, email: true },
-      }),
+      shouldSearch("entity")
+        ? prisma.engineeringEntity.findMany({
+            where: {
+              organizationId: orgId,
+              deletedAt: null,
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { identifier: { contains: q, mode: "insensitive" } },
+                { description: { contains: q, mode: "insensitive" } },
+              ],
+            },
+            take: perType,
+            orderBy: { updatedAt: "desc" },
+            select: { id: true, name: true, identifier: true, entityType: true },
+          })
+        : Promise.resolve([]),
+      shouldSearch("document")
+        ? prisma.ingestionDocument.findMany({
+            where: {
+              organizationId: orgId,
+              deletedAt: null,
+              fileName: { contains: q, mode: "insensitive" },
+            },
+            take: perType,
+            orderBy: { updatedAt: "desc" },
+            select: { id: true, fileName: true, fileExtension: true },
+          })
+        : Promise.resolve([]),
+      shouldSearch("organization")
+        ? prisma.organization.findMany({
+            where: {
+              members: { some: { userId: session.userId, status: "active" } },
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { slug: { contains: q, mode: "insensitive" } },
+              ],
+            },
+            take: perType,
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, slug: true },
+          })
+        : Promise.resolve([]),
+      shouldSearch("user")
+        ? prisma.user.findMany({
+            where: {
+              memberships: { some: { organizationId: orgId, status: "active" } },
+              OR: [
+                { email: { contains: q, mode: "insensitive" } },
+                { name: { contains: q, mode: "insensitive" } },
+              ],
+            },
+            take: perType,
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, email: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     for (const entity of entities) {
@@ -148,6 +172,9 @@ export async function GET(request: Request) {
         { status: error.statusCode },
       );
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
+      { status: 500 },
+    );
   }
 }

@@ -19,7 +19,7 @@ Data is fetched in parallel from:
 - `/api/dashboard/summary` — organization metrics
 - `/api/activity?limit=10` — activity timeline
 - `/api/engineering/entities?limit=5` — recent entities
-- `/api/ingestion/documents?limit=5` — recent documents
+- `/api/ingestion/documents?page=1&pageSize=5` — recent documents
 
 ### Engineering Entities (`/entities`)
 
@@ -49,26 +49,36 @@ Interactive graph visualization with:
 
 Document workspace including:
 
-- Document list with filtering
+- Document list with search, pagination, status badges at `/documents`
 - Upload workflow at `/ingestion/upload`
 - Document detail with version history at `/ingestion/documents/[id]`
-- Job tracking at `/ingestion/[jobId]`
+- Job tracking at `/ingestion/[jobId]` and pipeline dashboard at `/ingestion`
 
 ### Search (`/search`)
 
-Placeholder page for the full search interface. The command palette (Cmd/Ctrl+K) provides immediate search access from any page.
+Full-page search experience with type filters and URL-synced query params. The command palette (Cmd/Ctrl+K) remains available from any page and links into the full search view.
+
+### Settings (`/settings`)
+
+Account profile readout, organization shortcuts, local theme preference, password reset entry, and sign-out.
+
+### Audit Log (`/audit`)
+
+Organization audit browser with filtering, pagination, and CSV export. Backed by `GET /api/audit` and `GET /api/audit/export`.
 
 ## API Endpoints
 
 | Endpoint                            | Purpose                                                        |
 | ----------------------------------- | -------------------------------------------------------------- |
-| `GET /api/search?q=&limit=`         | Global search across entities, documents, organizations, users |
+| `GET /api/search?q=&limit=&type=`   | Global search across entities, documents, organizations, users |
 | `GET /api/activity?limit=`          | Recent activity timeline                                       |
 | `GET /api/dashboard/summary`        | Organization summary metrics                                   |
 | `GET /api/engineering/entities`     | Entity list with filtering, sorting, pagination                |
 | `GET /api/engineering/types`        | Entity types and statuses for filters                          |
 | `GET /api/ingestion/documents`      | Document list with filtering                                   |
 | `GET /api/knowledge-graph/subgraph` | Graph nodes and edges                                          |
+| `GET /api/audit`                    | Organization audit log with filters and pagination             |
+| `GET /api/audit/export`             | CSV export of filtered audit events                            |
 
 ## Design Tokens
 

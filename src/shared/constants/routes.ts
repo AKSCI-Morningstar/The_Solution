@@ -18,6 +18,7 @@ export const ROUTES = {
   ingestion: "/ingestion",
   orchestrator: "/orchestrator",
   reality: "/reality",
+  audit: "/audit",
 } as const;
 
 export interface SidebarNavItem {
@@ -87,6 +88,7 @@ export const SIDEBAR_NAV: SidebarNavEntry[] = [
     items: [
       { label: "Organizations", href: ROUTES.organizations, icon: "Building2" },
       { label: "Settings", href: ROUTES.settings, icon: "Settings" },
+      { label: "Audit Log", href: ROUTES.audit, icon: "ScrollText" },
       { label: "Notifications", href: ROUTES.notifications, icon: "Bell" },
     ],
   },

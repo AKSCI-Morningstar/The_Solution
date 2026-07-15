@@ -90,7 +90,7 @@ export default function DashboardPage() {
       const [activityRes, entitiesRes, docsRes, summaryRes] = await Promise.all([
         fetch("/api/activity?limit=10"),
         fetch("/api/engineering/entities?limit=5"),
-        fetch("/api/ingestion/documents?limit=5"),
+        fetch("/api/ingestion/documents?page=1&pageSize=5"),
         fetch("/api/dashboard/summary"),
       ]);
 
@@ -111,7 +111,7 @@ export default function DashboardPage() {
         setOrgSummary(json.data ?? null);
       }
     } catch {
-      // Silently handle — dashboard is non-critical
+      setOrgSummary(null);
     } finally {
       setIsLoading(false);
     }

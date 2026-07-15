@@ -69,9 +69,7 @@ test.describe("Authentication Flow (Protected Routes)", () => {
     expect(url).toContain("next=%2Fdashboard");
   });
 
-  test("should return 401 for unauthenticated API requests", async ({
-    page,
-  }) => {
+  test("should return 401 for unauthenticated API requests", async ({ page }) => {
     const response = await page.request.get("/api/health");
     // Note: /api/health is public, so this test verifies protected endpoints
     // In a real scenario, test against a protected API endpoint
@@ -102,9 +100,7 @@ test.describe("Error Handling", () => {
     const requestId = response.headers()["x-request-id"];
     expect(requestId).toBeDefined();
     // Request ID should be a valid UUID format
-    expect(requestId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
+    expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
   });
 });
 
@@ -125,6 +121,38 @@ test.describe("Performance", () => {
 
     // API should respond in under 500ms
     expect(responseTime).toBeLessThan(500);
+  });
+});
+
+test.describe("Protected workspace surfaces", () => {
+  test("documents route redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/documents");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("search route redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/search");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("settings route redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("audit route redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/audit");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("audit API requires authentication", async ({ page }) => {
+    const response = await page.request.get("/api/audit");
+    expect([401, 403]).toContain(response.status());
+  });
+
+  test("search API requires authentication", async ({ page }) => {
+    const response = await page.request.get("/api/search?q=test");
+    expect([401, 403]).toContain(response.status());
   });
 });
 

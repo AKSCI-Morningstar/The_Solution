@@ -16,8 +16,8 @@ export const ROUTES = {
   suppliers: "/suppliers",
   ai: "/ai",
   notifications: "/notifications",
+  audit: "/audit",
   api: {
     health: "/api/health",
-    timestamps: "/api/timestamps",
   },
 } as const;

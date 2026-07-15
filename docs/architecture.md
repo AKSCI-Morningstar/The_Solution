@@ -113,11 +113,14 @@ providers/ ---------------------------------------------------┘
 src/
 ├── app/                         # Next.js App Router
 │   ├── (dashboard)/             # Authenticated app route group
-│   │   ├── _components/         # Shared page components (PagePlaceholder)
+│   │   ├── _components/         # Shared dashboard helpers
 │   │   ├── layout.tsx           # Dashboard layout with Shell
 │   │   ├── dashboard/           # Dashboard page
-│   │   ├── documents/           # Documents page (placeholder)
-│   │   ├── knowledge-graph/     # Knowledge Graph page (placeholder)
+│   │   ├── documents/           # Document workspace list
+│   │   ├── search/              # Full workspace search
+│   │   ├── settings/            # Account & preferences
+│   │   ├── audit/               # Audit log browser
+│   │   ├── knowledge-graph/     # Knowledge Graph page
 │   │   └── ...                  # Other feature pages
 │   ├── api/                     # API route handlers
 │   ├── layout.tsx               # Root layout with providers

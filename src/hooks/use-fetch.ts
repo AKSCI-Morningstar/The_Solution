@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type FetchState<T> = {
   data: T | null;
@@ -10,21 +10,40 @@ type FetchState<T> = {
   isError: boolean;
 };
 
-export function useFetch<T>(url: string): FetchState<T> & { refetch: () => Promise<void> } {
+/**
+ * Lightweight fetch hook with automatic load on mount/url change.
+ * Prefer feature-local loaders for complex query-parameter state.
+ */
+export function useFetch<T>(
+  url: string | null,
+  options?: { enabled?: boolean },
+): FetchState<T> & { refetch: () => Promise<void> } {
+  const enabled = options?.enabled ?? true;
   const [state, setState] = useState<FetchState<T>>({
     data: null,
     error: null,
-    isPending: false,
+    isPending: Boolean(url) && enabled,
     isSuccess: false,
     isError: false,
   });
 
   const refetch = useCallback(async () => {
-    setState({ data: null, error: null, isPending: true, isSuccess: false, isError: false });
+    if (!url || !enabled) {
+      setState({ data: null, error: null, isPending: false, isSuccess: false, isError: false });
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      error: null,
+      isPending: true,
+      isSuccess: false,
+      isError: false,
+    }));
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${response.status}: ${response.statusText}`);
       }
       const data: T = await response.json();
       setState({ data, error: null, isPending: false, isSuccess: true, isError: false });
@@ -32,7 +51,12 @@ export function useFetch<T>(url: string): FetchState<T> & { refetch: () => Promi
       const error = e instanceof Error ? e : new Error(String(e));
       setState({ data: null, error, isPending: false, isSuccess: false, isError: true });
     }
-  }, [url]);
+  }, [url, enabled]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refetch();
+  }, [refetch]);
 
   return { ...state, refetch };
 }

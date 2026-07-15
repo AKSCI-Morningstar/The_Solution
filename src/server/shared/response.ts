@@ -1,18 +1,27 @@
-export async function createApiResponse<T>(data: T, status: number = 200): Promise<Response> {
-  return new Response(JSON.stringify({ data }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+import { NextResponse } from "next/server";
+
+export function createApiResponse<T>(data: T, status: number = 200): NextResponse {
+  return NextResponse.json({ data }, { status });
 }
 
-export async function createErrorResponse(
+export function createPaginatedResponse<T>(
+  result: {
+    data: T;
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  },
+  status: number = 200,
+): NextResponse {
+  return NextResponse.json(result, { status });
+}
+
+export function createErrorResponse(
   message: string,
   code: string,
   status: number,
   details?: Record<string, unknown>,
-): Promise<Response> {
-  return new Response(JSON.stringify({ error: message, code, ...(details ? { details } : {}) }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+): NextResponse {
+  return NextResponse.json({ error: message, code, ...(details ? { details } : {}) }, { status });
 }

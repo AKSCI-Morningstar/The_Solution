@@ -83,6 +83,8 @@ export type {
 } from "./table";
 export { EmptyState } from "./empty-state";
 export type { EmptyStateProps } from "./empty-state";
+export { QueryError } from "./query-error";
+export type { QueryErrorProps } from "./query-error";
 export { StatusIndicator } from "./status-indicator";
 export type { StatusIndicatorProps } from "./status-indicator";
 export { MetricCard } from "./metric-card";

@@ -427,6 +427,8 @@ model AuditLog {
   @@index([createdAt])
   @@index([organizationId])
   @@index([organizationId, entity])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, action])
 }
 
 model Timestamp {
