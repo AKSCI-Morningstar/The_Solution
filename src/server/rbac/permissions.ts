@@ -11,6 +11,7 @@ export const Resources = {
   CONTRADICTIONS: "contradictions",
   ORCHESTRATOR: "orchestrator",
   REALITY: "reality",
+  REPORTING: "reporting",
 } as const;
 
 export const Actions = {
@@ -91,6 +92,11 @@ export const Permissions = {
     execute: "reality:execute",
     manage: "reality:manage",
   },
+  reporting: {
+    read: "reporting:read",
+    execute: "reporting:execute",
+    manage: "reporting:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -134,7 +140,10 @@ export type PermissionString =
   | "orchestrator:manage"
   | "reality:read"
   | "reality:execute"
-  | "reality:manage";
+  | "reality:manage"
+  | "reporting:read"
+  | "reporting:execute"
+  | "reporting:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -178,6 +187,9 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.reality.read,
   Permissions.reality.execute,
   Permissions.reality.manage,
+  Permissions.reporting.read,
+  Permissions.reporting.execute,
+  Permissions.reporting.manage,
 ];
 
 export interface RoleDefinition {
@@ -238,6 +250,9 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.reality.read,
       Permissions.reality.execute,
       Permissions.reality.manage,
+      Permissions.reporting.read,
+      Permissions.reporting.execute,
+      Permissions.reporting.manage,
     ],
   },
   {
@@ -258,6 +273,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
       Permissions.reality.read,
+      Permissions.reporting.read,
     ],
   },
   {
@@ -290,6 +306,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.orchestrator.execute,
       Permissions.reality.read,
       Permissions.reality.execute,
+      Permissions.reporting.read,
+      Permissions.reporting.execute,
     ],
   },
   {
@@ -309,6 +327,7 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.contradictions.read,
       Permissions.orchestrator.read,
       Permissions.reality.read,
+      Permissions.reporting.read,
     ],
   },
 ];

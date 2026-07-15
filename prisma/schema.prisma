@@ -47,6 +47,7 @@ model User {
   triggeredOrchestrations OrchestrationRun[]          @relation("OrchestrationTriggeredBy")
   triggeredRealityAssessments RealityAssessment[]     @relation("RealityAssessmentTriggeredBy")
   notifications           Notification[]
+  generatedReports         Report[]                  @relation("ReportGeneratedBy")
 
   @@index([email])
   @@index([status])
@@ -89,6 +90,7 @@ model Organization {
   orchestrationRuns        OrchestrationRun[]
   realityAssessments       RealityAssessment[]
   notifications            Notification[]
+  reports                  Report[]
 
   @@index([slug])
   @@index([ownerId])
@@ -1016,4 +1018,37 @@ model RealityStageLog {
 
   @@index([assessmentId])
   @@index([assessmentId, stageIndex])
+}
+
+// ---------------------------------------------------------------------------
+// Enterprise Reporting & Engineering Analytics Platform
+//
+// Every report is generated synchronously from a fixed `type` plus
+// deterministic `filters`, computed entirely from data already persisted by
+// the other subsystems (no generative or probabilistic logic). The computed
+// `data` payload is persisted immutably alongside the report row, so every
+// report is itself a permanent, re-viewable, exportable record - "saved
+// reports" are simply this table; "favorites" is the one mutable field.
+// ---------------------------------------------------------------------------
+
+model Report {
+  id             String    @id @default(cuid())
+  organizationId String
+  type           String
+  title          String
+  filters        Json      @default("{}")
+  data           Json
+  isFavorite     Boolean   @default(false)
+  generatedById  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generatedBy  User?        @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, type])
+  @@index([organizationId, isFavorite])
+  @@index([generatedById])
+  @@index([createdAt])
 }
