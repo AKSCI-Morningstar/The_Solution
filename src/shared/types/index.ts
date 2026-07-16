@@ -1,4 +1,37 @@
 export type { BreadcrumbItem, SidebarItem, PageMeta } from "./navigation";
-export type { TimestampRecord, AuditLogEntry, ApiResponse, ApiError } from "@/types";
-export type { Result } from "@/types/result";
+export type { Result } from "./result";
 export type { PaginationInput, DateRange, SearchInput } from "@/shared/validation";
+
+export interface TimestampRecord {
+  id: string;
+  label: string;
+  value: Date;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  meta?: {
+    total?: number;
+    page?: number;
+    pageSize?: number;
+  };
+}
+
+export interface ApiError {
+  message: string;
+  code: string;
+  details?: Record<string, unknown>;
+}

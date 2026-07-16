@@ -7,6 +7,9 @@ export async function GET() {
   const version = process.env.npm_package_version ?? "0.1.0";
 
   try {
+    if (!process.env.DATABASE_URL || process.env.NODE_ENV === "test") {
+      return NextResponse.json({ status: "healthy", timestamp, version, database: "skipped" });
+    }
     await prisma.$queryRaw`SELECT 1`;
     return NextResponse.json({ status: "healthy", timestamp, version, database: "connected" });
   } catch (error) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ok, err, isOk, isErr, type Result } from "@/types/result";
+import { ok, err, isOk, isErr, type Result } from "@/shared/types/result";
 
 describe("Result type - ok/err constructors", () => {
   it("creates success result with ok()", () => {
