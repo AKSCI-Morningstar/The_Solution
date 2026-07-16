@@ -23,9 +23,10 @@ const sizeStyles: Record<NonNullable<ButtonProps["size"]>, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = "", variant = "primary", size = "md", ...props }, ref) => {
+  ({ className = "", variant = "primary", size = "md", type = "button", ...props }, ref) => {
     return (
       <button
+        type={type}
         ref={ref}
         className={cn(
           "focus-visible:ring-ring inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
