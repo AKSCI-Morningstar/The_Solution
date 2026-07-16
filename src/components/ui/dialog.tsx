@@ -6,12 +6,10 @@ export interface DialogProps extends HTMLAttributes<HTMLDivElement> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
-  "aria-labelledby"?: string;
-  "aria-describedby"?: string;
 }
 
 export const Dialog = forwardRef<HTMLDivElement, DialogProps>(
-  ({ className = "", open, onOpenChange, children, "aria-labelledby": ariaLabelledBy, "aria-describedby": ariaDescribedBy, ...props }, ref) => {
+  ({ className = "", open, onOpenChange, children, ...props }, ref) => {
     useEffect(() => {
       const handleEscape = (e: KeyboardEvent) => {
         if (e.key === "Escape") onOpenChange(false);
@@ -35,8 +33,6 @@ export const Dialog = forwardRef<HTMLDivElement, DialogProps>(
           ref={ref}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={ariaLabelledBy}
-          aria-describedby={ariaDescribedBy}
           className={cn(
             "border-border bg-background animate-fade-in relative z-50 w-full max-w-md rounded-lg border p-6 shadow-xl",
             className,

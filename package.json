@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Engineering Reality Platform - Verifying engineering truth through deterministic, evidence-based reasoning",
+  "packageManager": "pnpm@10.30.3",
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
