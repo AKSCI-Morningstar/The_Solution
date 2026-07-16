@@ -50,6 +50,9 @@ model User {
   generatedReports         Report[]                  @relation("ReportGeneratedBy")
   createdSuppliers         Supplier[]                @relation("SupplierCreatedBy")
   updatedSuppliers         Supplier[]                @relation("SupplierUpdatedBy")
+  historicalPrecedents        HistoricalPrecedent[]        @relation("PrecedentOwner")
+  historicalPrecedentVersions HistoricalPrecedentVersion[] @relation("VersionCreator")
+  decisionsFinalized          Decision[]                   @relation("DecisionFinalizer")
 
   @@index([email])
   @@index([status])
@@ -96,6 +99,8 @@ model Organization {
   suppliers                Supplier[]
   supplierFacilities       SupplierFacility[]
   supplierRelationships    SupplierRelationship[]
+  historicalPrecedents     HistoricalPrecedent[]
+  decisions                Decision[]
 
   @@index([slug])
   @@index([ownerId])
@@ -1248,4 +1253,89 @@ model SupplierRelationship {
   @@index([organizationId, sourceSupplierId])
   @@index([organizationId, targetSupplierId])
   @@index([organizationId, relationshipType])
+}
+
+model HistoricalPrecedent {
+  id                    String                       @id @default(cuid())
+  organizationId        String
+  title                 String
+  summary               String
+  engineeringQuestion   String
+  decisionMade          String
+  supportingEvidence    Json?
+  contradictions        Json?
+  missingEvidence       Json?
+  outcome               String
+  lessonsLearned        String
+  relatedProjects       Json?     // Array of strings
+  relatedSuppliers      Json?     // Array of strings
+  relatedRequirements   Json?     // Array of strings
+  relatedDocuments      Json?     // Array of strings
+  relatedComponents     Json?     // Array of strings
+  relatedStandards      Json?     // Array of strings
+  relatedCertifications Json?     // Array of strings
+  decisionDate          DateTime                     @default(now())
+  decisionOwnerId       String?
+  confidence            Float                        @default(1.0)
+  tags                  Json?     // Array of strings
+  auditMetadata         Json?     // JSON array of audit logs
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+  deletedAt             DateTime?
+
+  organization  Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  decisionOwner User?                        @relation("PrecedentOwner", fields: [decisionOwnerId], references: [id])
+  versions      HistoricalPrecedentVersion[]
+
+  @@index([organizationId])
+  @@index([decisionOwnerId])
+  @@index([deletedAt])
+}
+
+model HistoricalPrecedentVersion {
+  id                String              @id @default(cuid())
+  precedentId       String
+  version           Int                 @default(1)
+  title             String
+  summary           String
+  decisionMade      String
+  outcome           String
+  lessonsLearned    String
+  snapshot          Json
+  changeDescription String?
+  createdById       String?
+  createdAt         DateTime            @default(now())
+
+  precedent HistoricalPrecedent @relation(fields: [precedentId], references: [id], onDelete: Cascade)
+  createdBy User?               @relation("VersionCreator", fields: [createdById], references: [id])
+
+  @@index([precedentId])
+  @@index([createdById])
+}
+
+model Decision {
+  id                  String               @id @default(cuid())
+  organizationId      String
+  question            String
+  context             String?
+  status              String               @default("INTAKE") // INTAKE, EVIDENCE_REVIEW, FINALIZED
+  subjectEntityId     String?
+  supportingEvidence  Json?
+  contradictions      Json?
+  unresolvedGaps      Json?
+  precedents          Json?
+  finalDecision       String?
+  rationale           String?
+  finalizedAt         DateTime?
+  finalizedById       String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  finalizedBy         User?                @relation("DecisionFinalizer", fields: [finalizedById], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
 }

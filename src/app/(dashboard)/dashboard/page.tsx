@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -11,6 +12,12 @@ import {
   FileText,
   Download,
   Check,
+  History,
+  FileCheck2,
+  UserCheck,
+  ChevronRight,
+  ArrowLeft,
+  Lock,
 } from "lucide-react";
 import { PageContainer, Panel, Stack } from "@/components/layout";
 import { Input, Button, Badge, Card, CardContent, Divider } from "@/components/ui";
@@ -193,7 +200,7 @@ const PRESETS = [
     precedent: {
       project: "Seawater Intake Impeller cracking (2024)",
       problem:
-        "Impeller blades suffered brittle fracture due to undetected flow cavitation stress.",
+        "Brittle fracture risks in corrosive environments must be verified against cavitation limit curves.",
       decision: "Upgraded material specification from grade 316 stainless steel to Duplex 2507.",
       outcome: "Intake pumps have run continuously for 24 months without crack indications.",
       lessonsLearned:
@@ -247,32 +254,85 @@ export default function WorkspacePage() {
   const [error, setError] = useState("");
   const [exportSuccess, setExportSuccess] = useState(false);
 
-  // Run target compliance evaluation
-  const evaluateTarget = useCallback(async (entity: EntityOption) => {
-    setSelectedEntity(entity);
-    setIsEvaluating(true);
-    setError("");
-    setResolution(null);
+  // Decision state tracking
+  const [decisions, setDecisions] = useState<any[]>([]);
+  const [activeDecision, setActiveDecision] = useState<any | null>(null);
+  const [finalDecisionText, setFinalDecisionText] = useState("");
+  const [rationaleText, setRationaleText] = useState("");
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [finalizeSuccess, setFinalizeSuccess] = useState(false);
+  const [validationError, setValidationError] = useState("");
 
+  const fetchRecentDecisions = useCallback(async () => {
     try {
-      const res = await fetch("/api/evidence/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entityId: entity.id, maxDepth: 5 }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        setError(err.error ?? "Verification failed");
-        return;
+      const res = await fetch("/api/decisions");
+      if (res.ok) {
+        const json = await res.json();
+        setDecisions(json.data ?? []);
       }
-      const json = await res.json();
-      setResolution(json.data);
-    } catch {
-      setError("An error occurred during target compliance evaluation.");
-    } finally {
-      setIsEvaluating(false);
+    } catch (err) {
+      console.error("Failed to fetch decisions", err);
     }
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchRecentDecisions();
+  }, [fetchRecentDecisions]);
+
+  // Run target compliance evaluation
+  const evaluateTarget = useCallback(
+    async (entity: EntityOption, currentDecision?: any) => {
+      setSelectedEntity(entity);
+      setIsEvaluating(true);
+      setError("");
+      setResolution(null);
+      setValidationError("");
+
+      const dec = currentDecision || activeDecision;
+
+      try {
+        const res = await fetch("/api/evidence/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityId: entity.id, maxDepth: 5 }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          setError(err.error ?? "Verification failed");
+          return;
+        }
+        const json = await res.json();
+        setResolution(json.data);
+
+        // If active decision exists, patch evidence and transition status to EVIDENCE_REVIEW
+        if (dec) {
+          const updateRes = await fetch(`/api/decisions/${dec.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "EVIDENCE_REVIEW",
+              subjectEntityId: entity.id,
+              supportingEvidence: json.data.supportingEvidence,
+              contradictions: json.data.conflicts,
+              unresolvedGaps: json.data.missingEvidence,
+              precedents: precedent ? [precedent] : [],
+            }),
+          });
+          if (updateRes.ok) {
+            const updateJson = await updateRes.json();
+            setActiveDecision(updateJson.data);
+            fetchRecentDecisions();
+          }
+        }
+      } catch {
+        setError("An error occurred during target compliance evaluation.");
+      } finally {
+        setIsEvaluating(false);
+      }
+    },
+    [activeDecision, fetchRecentDecisions, precedent],
+  );
 
   // Search entities based on question terms
   const searchTargets = useCallback(
@@ -283,6 +343,9 @@ export default function WorkspacePage() {
       setResolution(null);
       setPrecedent(null);
       setError("");
+      setValidationError("");
+      setFinalDecisionText("");
+      setRationaleText("");
 
       try {
         // Find matching preset for precedents
@@ -290,6 +353,20 @@ export default function WorkspacePage() {
           queryText.toLowerCase().includes(p.targetQuery.toLowerCase()),
         );
         setPrecedent(matchedPreset ? matchedPreset.precedent : DEFAULT_PRECEDENT);
+
+        // Start a new decision workflow in the DB
+        const decisionRes = await fetch("/api/decisions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: queryText }),
+        });
+        let decisionData = null;
+        if (decisionRes.ok) {
+          const decisionJson = await decisionRes.json();
+          decisionData = decisionJson.data;
+          setActiveDecision(decisionData);
+          fetchRecentDecisions();
+        }
 
         // Search for entities matching the terms
         const searchTerms = matchedPreset ? matchedPreset.targetQuery : queryText;
@@ -302,7 +379,7 @@ export default function WorkspacePage() {
 
           // Auto-select first matching entity if available
           if (json.data && json.data.length > 0) {
-            evaluateTarget(json.data[0]);
+            evaluateTarget(json.data[0], decisionData);
           } else {
             // If no entities found, fallback search to a generic query to get some items
             const fallbackRes = await fetch(`/api/engineering/entities?pageSize=5`);
@@ -310,7 +387,7 @@ export default function WorkspacePage() {
               const fallbackJson = await fallbackRes.json();
               setEntityResults(fallbackJson.data ?? []);
               if (fallbackJson.data && fallbackJson.data.length > 0) {
-                evaluateTarget(fallbackJson.data[0]);
+                evaluateTarget(fallbackJson.data[0], decisionData);
               }
             }
           }
@@ -321,12 +398,135 @@ export default function WorkspacePage() {
         setIsSearching(false);
       }
     },
-    [evaluateTarget],
+    [evaluateTarget, fetchRecentDecisions],
   );
 
   const handlePresetClick = (presetText: string) => {
     setQuestion(presetText);
     searchTargets(presetText);
+  };
+
+  const handleSelectDecision = useCallback(
+    async (dec: any) => {
+      setActiveDecision(dec);
+      setQuestion(dec.question);
+      setEntityResults([]);
+      setSelectedEntity(null);
+      setResolution(null);
+      setPrecedent(null);
+      setFinalDecisionText(dec.finalDecision || "");
+      setRationaleText(dec.rationale || "");
+      setValidationError("");
+
+      if (dec.status === "FINALIZED") {
+        // Create mockup resolution structure from DB saved data
+        setResolution({
+          status: "FINALIZED",
+          subjectId: dec.subjectEntityId || "unknown",
+          subjectLabel: dec.subjectEntityId ? "Resolved Component" : "General Question",
+          supportingEvidence: dec.supportingEvidence || [],
+          conflictingEvidence: [],
+          missingEvidence: dec.unresolvedGaps || [],
+          evidenceChains: [],
+          traceabilityGraph: {
+            rootEntityId: dec.subjectEntityId || "",
+            records: [],
+            totalRecords: 0,
+          },
+          conflicts: dec.contradictions || [],
+          qualityIndicators: {
+            totalNodes: (dec.supportingEvidence?.length ?? 0) + (dec.contradictions?.length ?? 0),
+            supportingNodes: dec.supportingEvidence?.length ?? 0,
+            conflictingNodes: dec.contradictions?.length ?? 0,
+            missingNodes: dec.unresolvedGaps?.length ?? 0,
+            hasDocumentProvenance: true,
+            hasVersionInfo: true,
+            hasPageReferences: true,
+            hasExtractionSource: true,
+            quality: (dec.contradictions?.length ?? 0) > 0 ? "COMPROMISED" : "STRONG",
+          },
+          summary: {
+            totalEvidence: dec.supportingEvidence?.length ?? 0,
+            supportingEvidence: dec.supportingEvidence?.length ?? 0,
+            conflictingEvidence: dec.contradictions?.length ?? 0,
+            missingEvidence: dec.unresolvedGaps?.length ?? 0,
+            uniqueDocuments: 0,
+            uniqueEntities: 0,
+            oldestEvidence: null,
+            newestEvidence: null,
+          },
+          resolvedAt: dec.finalizedAt || dec.updatedAt,
+        });
+
+        if (dec.precedents && dec.precedents.length > 0) {
+          setPrecedent(dec.precedents[0]);
+        } else {
+          setPrecedent(null);
+        }
+      } else {
+        // Resume active review
+        if (dec.subjectEntityId) {
+          try {
+            const res = await fetch(`/api/engineering/entities/${dec.subjectEntityId}`);
+            if (res.ok) {
+              const json = await res.json();
+              const entity = json.data;
+              if (entity) {
+                setEntityResults([entity]);
+                evaluateTarget(entity, dec);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to load entity", err);
+          }
+        }
+      }
+    },
+    [evaluateTarget],
+  );
+
+  const handleFinalizeDecision = async () => {
+    if (!activeDecision) return;
+    setValidationError("");
+
+    if (!finalDecisionText.trim()) {
+      setValidationError("Final decision statement is required.");
+      return;
+    }
+
+    if (!rationaleText.trim()) {
+      setValidationError("Rationale and mitigation notes are required.");
+      return;
+    }
+
+    setIsFinalizing(true);
+    try {
+      const res = await fetch(`/api/decisions/${activeDecision.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "FINALIZED",
+          finalDecision: finalDecisionText,
+          rationale: rationaleText,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        setValidationError(json.error ?? "Failed to finalize decision.");
+        return;
+      }
+
+      const json = await res.json();
+      setActiveDecision(json.data);
+      setFinalizeSuccess(true);
+      fetchRecentDecisions();
+      setTimeout(() => setFinalizeSuccess(false), 3000);
+    } catch {
+      setValidationError("An error occurred while finalizing the decision.");
+    } finally {
+      setIsFinalizing(false);
+    }
   };
 
   const handleExportDecision = () => {
@@ -345,6 +545,16 @@ export default function WorkspacePage() {
       },
       qualityRating: resolution.qualityIndicators.quality,
       exportedAt: new Date().toISOString(),
+      decisionRecord: activeDecision
+        ? {
+            id: activeDecision.id,
+            status: activeDecision.status,
+            question: activeDecision.question,
+            finalDecision: activeDecision.finalDecision,
+            rationale: activeDecision.rationale,
+            finalizedAt: activeDecision.finalizedAt,
+          }
+        : null,
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
@@ -358,6 +568,15 @@ export default function WorkspacePage() {
     URL.revokeObjectURL(url);
 
     setTimeout(() => setExportSuccess(false), 3000);
+  };
+
+  const handleBackToHistory = () => {
+    setActiveDecision(null);
+    setSelectedEntity(null);
+    setResolution(null);
+    setPrecedent(null);
+    setQuestion("");
+    setValidationError("");
   };
 
   // Determine verification strength class & label
@@ -377,68 +596,93 @@ export default function WorkspacePage() {
     return status.replace(/_/g, " ");
   };
 
+  const getStatusBadgeColor = (status: string) => {
+    if (status === "FINALIZED")
+      return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-400";
+    if (status === "EVIDENCE_REVIEW")
+      return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-400";
+    return "border-zinc-200 bg-zinc-50 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400";
+  };
+
   return (
     <PageContainer>
       <Stack gap={8}>
         {/* Header Title */}
-        <div className="flex flex-col gap-2">
-          <h1 className="text-foreground text-3xl font-semibold tracking-tight">
-            Verification Workspace
-          </h1>
-          <p className="text-muted-foreground max-w-2xl text-sm leading-normal">
-            Query engineering specifications, gather traceable evidence, analyze contradictions, and
-            package verified decisions deterministically.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-foreground text-3xl font-semibold tracking-tight">
+              Verification Workspace
+            </h1>
+            <p className="text-muted-foreground max-w-2xl text-sm leading-normal">
+              Query engineering specifications, gather traceable evidence, analyze contradictions,
+              and package verified decisions deterministically.
+            </p>
+          </div>
+          {activeDecision && (
+            <Button
+              onClick={handleBackToHistory}
+              variant="secondary"
+              className="flex items-center gap-2 border-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+            >
+              <ArrowLeft className="size-4" />
+              <span>Back to History</span>
+            </Button>
+          )}
         </div>
 
-        {/* --- QUESTION INPUT SECTION --- */}
-        <Panel padding="lg" className="border border-zinc-200 bg-zinc-950/20 dark:border-zinc-800">
-          <Stack gap={4}>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="question-input" className="text-foreground text-sm font-medium">
-                Ask an Engineering Question
-              </label>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="relative flex-1">
-                  <Search className="text-muted-foreground absolute top-1/2 left-3.5 size-4 -translate-y-1/2" />
-                  <Input
-                    id="question-input"
-                    placeholder="Enter an engineering question or verify a supplier, component, or revision..."
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && searchTargets(question)}
-                    className="h-11 border-zinc-200 pl-10 dark:border-zinc-800"
-                  />
-                </div>
-                <Button
-                  className="h-11 shrink-0 bg-zinc-900 px-6 font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                  onClick={() => searchTargets(question)}
-                  disabled={isSearching}
-                >
-                  {isSearching ? "Processing..." : "Verify"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Quick Suggestions */}
-            <div className="flex flex-col gap-2">
-              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                Suggested Questions
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {PRESETS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handlePresetClick(preset.question)}
-                    className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1.5 text-left text-xs text-zinc-700 transition-colors hover:bg-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        {/* --- QUESTION INPUT SECTION (Hide when viewing active/finalized decisions) --- */}
+        {!activeDecision && (
+          <Panel
+            padding="lg"
+            className="border border-zinc-200 bg-zinc-950/20 dark:border-zinc-800"
+          >
+            <Stack gap={4}>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="question-input" className="text-foreground text-sm font-medium">
+                  Ask an Engineering Question
+                </label>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="text-muted-foreground absolute top-1/2 left-3.5 size-4 -translate-y-1/2" />
+                    <Input
+                      id="question-input"
+                      placeholder="Enter an engineering question or verify a supplier, component, or revision..."
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchTargets(question)}
+                      className="h-11 border-zinc-200 pl-10 dark:border-zinc-800"
+                    />
+                  </div>
+                  <Button
+                    className="h-11 shrink-0 bg-zinc-900 px-6 font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    onClick={() => searchTargets(question)}
+                    disabled={isSearching}
                   >
-                    {preset.question}
-                  </button>
-                ))}
+                    {isSearching ? "Processing..." : "Verify"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Stack>
-        </Panel>
+
+              {/* Quick Suggestions */}
+              <div className="flex flex-col gap-2">
+                <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+                  Suggested Questions
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handlePresetClick(preset.question)}
+                      className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1.5 text-left text-xs text-zinc-700 transition-colors hover:bg-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      {preset.question}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Stack>
+          </Panel>
+        )}
 
         {/* --- ERROR FEEDBACK --- */}
         {error && (
@@ -488,16 +732,87 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        {/* --- NO ACTIVE SELECTION --- */}
-        {!selectedEntity && !isSearching && !isEvaluating && entityResults.length === 0 && (
+        {/* --- DECISIONS HISTORY LIST (Only visible when no active workspace selection is running) --- */}
+        {!activeDecision && !isSearching && !isEvaluating && (
+          <Stack gap={4}>
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-2 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <History className="size-5 text-zinc-400" />
+                <h2 className="text-foreground text-lg font-semibold">
+                  Recent Engineering Decisions
+                </h2>
+              </div>
+              <span className="text-muted-foreground text-xs font-medium">
+                Total: {decisions.length} | Finalized:{" "}
+                {decisions.filter((d) => d.status === "FINALIZED").length} | In Progress:{" "}
+                {decisions.filter((d) => d.status !== "FINALIZED").length}
+              </span>
+            </div>
+
+            {decisions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/30 py-16 text-center dark:border-zinc-800 dark:bg-zinc-950/10">
+                <p className="text-muted-foreground text-sm">
+                  No decisions logged yet. Start a new query above to begin a workflow.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {decisions.map((dec) => (
+                  <Card
+                    key={dec.id}
+                    onClick={() => handleSelectDecision(dec)}
+                    className="bg-background group cursor-pointer border-zinc-200 shadow-sm transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:hover:border-zinc-700"
+                  >
+                    <CardContent className="flex h-full flex-col justify-between p-5">
+                      <Stack gap={3}>
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge
+                            className={cn(
+                              "border text-[10px] font-medium tracking-wider uppercase",
+                              getStatusBadgeColor(dec.status),
+                            )}
+                          >
+                            {dec.status.replace(/_/g, " ")}
+                          </Badge>
+                          <span className="text-muted-foreground text-[10px]">
+                            {new Date(dec.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-foreground line-clamp-2 text-sm font-semibold group-hover:text-zinc-950 dark:group-hover:text-zinc-100">
+                          {dec.question}
+                        </p>
+                        {dec.status === "FINALIZED" && (
+                          <div className="mt-1 flex flex-col gap-1 border-t border-zinc-100 pt-2 text-[11px] text-zinc-500 dark:border-zinc-800">
+                            <span className="line-clamp-2 italic">
+                              &quot;{dec.finalDecision}&quot;
+                            </span>
+                          </div>
+                        )}
+                      </Stack>
+                      <div className="mt-4 flex items-center justify-end text-xs font-semibold text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300">
+                        <span>
+                          {dec.status === "FINALIZED" ? "View Sign-off" : "Resume Review"}
+                        </span>
+                        <ChevronRight className="size-4" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Stack>
+        )}
+
+        {/* --- IDLE MESSAGE WHEN ACTIVE BUT NO DETAILS LOADED --- */}
+        {!selectedEntity && !isSearching && !isEvaluating && activeDecision && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/30 py-24 text-center dark:border-zinc-800 dark:bg-zinc-950/10">
             <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-900 dark:text-zinc-600">
               <ShieldCheck className="size-7" />
             </div>
-            <p className="text-foreground text-base font-medium">Workspace Idle</p>
+            <p className="text-foreground text-base font-medium">Workflow Resumed</p>
             <p className="text-muted-foreground mt-1.5 max-w-sm text-sm leading-normal">
-              Enter an engineering question above or click a suggestion to run the compliance
-              verification checklist.
+              Analyzing query target constraints... Please select or resolve a verification target
+              above.
             </p>
           </div>
         )}
@@ -525,6 +840,16 @@ export default function WorkspacePage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-3">
+                  {activeDecision && (
+                    <Badge
+                      className={cn(
+                        "border text-[10px] font-medium tracking-wider uppercase",
+                        getStatusBadgeColor(activeDecision.status),
+                      )}
+                    >
+                      Workflow: {activeDecision.status.replace(/_/g, " ")}
+                    </Badge>
+                  )}
                   <Badge
                     variant="secondary"
                     className="border-zinc-200 bg-zinc-100 font-medium text-zinc-800 capitalize dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
@@ -991,6 +1316,149 @@ export default function WorkspacePage() {
                 </Stack>
               </CardContent>
             </Card>
+
+            {/* --- ENGINEER SIGN-OFF & FINAL DECISION CAPTURE --- */}
+            {activeDecision && (
+              <Card className="border-zinc-200 bg-zinc-50/10 shadow-lg dark:border-zinc-800 dark:bg-zinc-950/20">
+                <CardContent className="p-6">
+                  <Stack gap={6}>
+                    <div className="flex items-center gap-3">
+                      {activeDecision.status === "FINALIZED" ? (
+                        <FileCheck2 className="size-6 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <UserCheck className="size-6 text-zinc-600 dark:text-zinc-400" />
+                      )}
+                      <div className="flex flex-col">
+                        <h3 className="text-foreground text-base font-semibold">
+                          {activeDecision.status === "FINALIZED"
+                            ? "Immutable Sign-off Certificate"
+                            : "Engineer Sign-off & Final Capture"}
+                        </h3>
+                        <p className="text-muted-foreground text-xs">
+                          {activeDecision.status === "FINALIZED"
+                            ? "This decision is locked, archived, and registered as a historical precedent."
+                            : "As the final human decision-maker, capture your engineering decision and rationale."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Divider className="border-zinc-250 dark:border-zinc-800" />
+
+                    {activeDecision.status === "FINALIZED" ? (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <Stack gap={3} className="rounded-lg bg-zinc-50/50 p-4 dark:bg-zinc-900/10">
+                          <div>
+                            <span className="text-muted-foreground text-xs font-semibold uppercase">
+                              Final Decision Statement
+                            </span>
+                            <p className="text-foreground mt-2 border-l-2 border-emerald-500 bg-zinc-500/5 py-1 pl-3 text-sm leading-relaxed font-medium">
+                              {activeDecision.finalDecision}
+                            </p>
+                          </div>
+                          <div className="mt-3 flex items-center gap-1.5 text-[11px] text-zinc-500">
+                            <Lock className="size-3 text-emerald-500" />
+                            <span>
+                              Signed by {activeDecision.finalizedById || "Authorized Engineer"}
+                            </span>
+                            <span>·</span>
+                            <span>{new Date(activeDecision.finalizedAt).toLocaleString()}</span>
+                          </div>
+                        </Stack>
+
+                        <Stack gap={3} className="rounded-lg bg-zinc-50/50 p-4 dark:bg-zinc-900/10">
+                          <div>
+                            <span className="text-muted-foreground text-xs font-semibold uppercase">
+                              Rationale & Mitigation Notes
+                            </span>
+                            <p className="text-foreground mt-2 text-sm leading-relaxed whitespace-pre-line">
+                              {activeDecision.rationale}
+                            </p>
+                          </div>
+                        </Stack>
+                      </div>
+                    ) : (
+                      <Stack gap={4}>
+                        {/* Validation warning if gaps exist */}
+                        {(resolution.conflicts.length > 0 ||
+                          resolution.missingEvidence.length > 0) && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-4 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/10 dark:text-amber-400">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                              <div>
+                                <span className="font-semibold">
+                                  Attention: Active contradictions or missing evidence detected.
+                                </span>
+                                <p className="mt-1 leading-normal opacity-90">
+                                  You are required to address these issues explicitly in the
+                                  Rationale & Mitigation notes below to explain how they are
+                                  resolved or why they are acceptable.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label
+                            htmlFor="final-decision-text"
+                            className="text-foreground text-sm font-semibold"
+                          >
+                            Final Decision Statement
+                          </label>
+                          <Input
+                            id="final-decision-text"
+                            placeholder="e.g. Approve Supplier X fastener usage for cyclic vibration load compliance."
+                            value={finalDecisionText}
+                            onChange={(e) => setFinalDecisionText(e.target.value)}
+                            className="border-zinc-200 dark:border-zinc-800"
+                            disabled={isFinalizing}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label
+                            htmlFor="rationale-text"
+                            className="text-foreground text-sm font-semibold"
+                          >
+                            Rationale & Mitigation Notes
+                          </label>
+                          <textarea
+                            id="rationale-text"
+                            placeholder="Document the exact engineering justification, limitations, and mitigations..."
+                            value={rationaleText}
+                            onChange={(e) => setRationaleText(e.target.value)}
+                            className="border-zinc-250 placeholder:text-muted-foreground focus-visible:ring-ring min-h-[100px] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800"
+                            disabled={isFinalizing}
+                          />
+                        </div>
+
+                        {validationError && (
+                          <div className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                            {validationError}
+                          </div>
+                        )}
+
+                        {finalizeSuccess && (
+                          <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            Sign-off completed successfully!
+                          </div>
+                        )}
+
+                        <div className="mt-2 flex justify-end">
+                          <Button
+                            onClick={handleFinalizeDecision}
+                            disabled={isFinalizing}
+                            className="h-11 bg-zinc-900 px-6 font-semibold text-zinc-50 shadow hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                          >
+                            {isFinalizing ? "Signing Off..." : "Sign Off & Finalize Decision"}
+                          </Button>
+                        </div>
+                      </Stack>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            )}
           </Stack>
         )}
       </Stack>

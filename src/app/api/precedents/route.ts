@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrecedents, createPrecedent } from "@/server/precedents/precedent-service";
-import { PrecedentType } from "@/features/precedents/types";
 import { requireActiveOrganization } from "@/server/organizations/organization-context";
 import { getCurrentUser } from "@/server/auth";
 
@@ -11,12 +10,11 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("type") || undefined;
     const system = searchParams.get("system") || undefined;
 
-    // Retrieve active organization context, fallback gracefully if not active
     let organizationId: string | undefined;
     try {
       organizationId = await requireActiveOrganization();
     } catch {
-      // Fallback handled inside precedent service
+      // Fallback
     }
 
     const data = await getPrecedents({ search, type, system, organizationId });
@@ -30,9 +28,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    
-    if (!body.title || !body.type || !body.description) {
-      return NextResponse.json({ error: "Missing required fields (title, type, description)" }, { status: 400 });
+
+    if (!body.title || !body.summary || !body.engineeringQuestion || !body.decisionMade) {
+      return NextResponse.json(
+        { error: "Missing required fields (title, summary, engineeringQuestion, decisionMade)" },
+        { status: 400 },
+      );
     }
 
     let organizationId: string | undefined;
@@ -42,21 +43,32 @@ export async function POST(req: NextRequest) {
       const user = await getCurrentUser();
       userId = user?.id;
     } catch {
-      // Fallback handled inside precedent service
+      // Fallback
     }
 
     const newPrec = await createPrecedent({
       title: body.title,
-      type: body.type as PrecedentType,
-      description: body.description,
-      rootCause: body.rootCause || undefined,
-      correctiveAction: body.correctiveAction || undefined,
-      resolutionStatus: body.resolutionStatus || "RESOLVED",
-      confidenceScore: parseFloat(body.confidenceScore) || 1.0,
-      applicableSystems: Array.isArray(body.applicableSystems) ? body.applicableSystems : [body.applicableSystems || "General"],
-      evidenceMetadata: body.evidenceMetadata || { documents: [], standards: [], testReports: [] },
+      summary: body.summary,
+      engineeringQuestion: body.engineeringQuestion,
+      decisionMade: body.decisionMade,
+      outcome: body.outcome || "Pending outcome verification",
+      lessonsLearned: body.lessonsLearned || "None recorded",
+      confidence: parseFloat(body.confidence) || 1.0,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      relatedProjects: Array.isArray(body.relatedProjects) ? body.relatedProjects : [],
+      relatedSuppliers: Array.isArray(body.relatedSuppliers) ? body.relatedSuppliers : [],
+      relatedRequirements: Array.isArray(body.relatedRequirements) ? body.relatedRequirements : [],
+      relatedDocuments: Array.isArray(body.relatedDocuments) ? body.relatedDocuments : [],
+      relatedComponents: Array.isArray(body.relatedComponents) ? body.relatedComponents : [],
+      relatedStandards: Array.isArray(body.relatedStandards) ? body.relatedStandards : [],
+      relatedCertifications: Array.isArray(body.relatedCertifications)
+        ? body.relatedCertifications
+        : [],
+      supportingEvidence: body.supportingEvidence || [],
+      contradictions: body.contradictions || [],
+      missingEvidence: body.missingEvidence || [],
       organizationId,
-      userId
+      userId,
     });
 
     return NextResponse.json({ data: newPrec }, { status: 201 });
@@ -65,4 +77,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
