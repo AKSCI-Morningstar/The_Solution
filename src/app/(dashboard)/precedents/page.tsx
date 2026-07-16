@@ -1,0 +1,898 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  History,
+  Search,
+  AlertOctagon,
+  CheckCircle2,
+  FileCheck2,
+  Plus,
+  ShieldCheck,
+  AlertTriangle,
+  Layers,
+  Sparkles,
+  Bookmark,
+  Network,
+  X,
+  FileText,
+  Clock,
+  GitBranch,
+  ShieldAlert
+} from "lucide-react";
+import { PageContainer, Section, Panel, GridLayout, Stack } from "@/components/layout";
+import { MetricCard, LoadingSpinner, EmptyState, Button } from "@/components/ui";
+import { cn } from "@/shared/utils";
+import { EngineeringPrecedent, PrecedentType } from "@/features/precedents/types";
+
+export default function PrecedentEnginePage() {
+  const [precedents, setPrecedents] = useState<EngineeringPrecedent[]>([]);
+  const [systems, setSystems] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Search and Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState<string>("ALL");
+  const [selectedSystem, setSelectedSystem] = useState<string>("ALL");
+
+  // Selected precedent for the interactive detail panel
+  const [selectedPrecedent, setSelectedPrecedent] = useState<EngineeringPrecedent | null>(null);
+
+  // Interactive Verification Reasoner State
+  const [verifySystem, setVerifySystem] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{
+    matchedPrecedents: EngineeringPrecedent[];
+    recommendations: string[];
+    missingEvidence: string[];
+    overallRisk: "LOW" | "MEDIUM" | "HIGH";
+  } | null>(null);
+
+  // Add Precedent Form Modal State
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    type: "FAILURE" as PrecedentType,
+    description: "",
+    rootCause: "",
+    correctiveAction: "",
+    resolutionStatus: "RESOLVED",
+    confidenceScore: 0.95,
+    applicableSystemsStr: "",
+    documentsStr: "",
+    standardsStr: ""
+  });
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState(false);
+
+  // Fetch Precedent data
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const typeParam = selectedType !== "ALL" ? `&type=${selectedType}` : "";
+      const systemParam = selectedSystem !== "ALL" ? `&system=${selectedSystem}` : "";
+      const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : "";
+
+      const [resPrecedents, resSystems] = await Promise.all([
+        fetch(`/api/precedents?${searchParam}${typeParam}${systemParam}`),
+        fetch("/api/precedents/systems")
+      ]);
+
+      if (resPrecedents.ok) {
+        const json = await resPrecedents.json();
+        const data: EngineeringPrecedent[] = json.data ?? [];
+        setPrecedents(data);
+        
+        // Auto-select first precedent if none is selected
+        if (data.length > 0 && !selectedPrecedent) {
+          setSelectedPrecedent(data[0]);
+        } else if (selectedPrecedent) {
+          // Keep selection synchronized with updated data
+          const updated = data.find(p => p.id === selectedPrecedent.id);
+          if (updated) setSelectedPrecedent(updated);
+        }
+      }
+      if (resSystems.ok) {
+        const json = await resSystems.json();
+        setSystems(json.data ?? []);
+      }
+    } catch (err) {
+      console.error("Failed to load precedents data", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedType, selectedSystem, searchQuery, selectedPrecedent]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [loadData]);
+
+  // Run interactive design verification
+  const handleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifySystem.trim()) return;
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+
+    setTimeout(() => {
+      const query = verifySystem.toLowerCase();
+      // Match precedents that relate to the system query
+      const matched = precedents.filter((p) =>
+        p.applicableSystems.some((sys) => sys.toLowerCase().includes(query)) ||
+        p.title.toLowerCase().includes(query) ||
+        p.description.toLowerCase().includes(query)
+      );
+
+      let overallRisk: "LOW" | "MEDIUM" | "HIGH" = "LOW";
+      const recommendations: string[] = [];
+      const missingEvidence: string[] = [];
+
+      if (matched.length > 0) {
+        const hasFailure = matched.some((p) => p.type === "FAILURE");
+        overallRisk = hasFailure ? "HIGH" : "MEDIUM";
+
+        matched.forEach((p) => {
+          if (p.correctiveAction && p.correctiveAction !== "N/A - System baseline verified.") {
+            recommendations.push(`From "${p.title}": ${p.correctiveAction}`);
+          }
+          if (p.evidenceMetadata?.standards && p.evidenceMetadata.standards.length > 0) {
+            missingEvidence.push(`Verification documents matching standard: ${p.evidenceMetadata.standards.join(", ")}`);
+          } else {
+            missingEvidence.push(`Independent validation report for design parameter referencing "${p.title}"`);
+          }
+        });
+      } else {
+        recommendations.push("No direct historical failure matches found. Proceed with standard baseline verification.");
+        missingEvidence.push("Standard peer review audit logs", "Component specification datasheet validation");
+      }
+
+      setVerificationResult({
+        matchedPrecedents: matched,
+        recommendations,
+        missingEvidence,
+        overallRisk
+      });
+      setIsVerifying(false);
+    }, 750);
+  };
+
+  // Form submit handler
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+    setFormSuccess(false);
+
+    if (!formData.title.trim() || !formData.description.trim()) {
+      setFormError("Title and Description are required.");
+      return;
+    }
+
+    try {
+      const payload = {
+        title: formData.title,
+        type: formData.type,
+        description: formData.description,
+        rootCause: formData.rootCause || undefined,
+        correctiveAction: formData.correctiveAction || undefined,
+        resolutionStatus: formData.resolutionStatus,
+        confidenceScore: parseFloat(formData.confidenceScore.toString()) || 0.95,
+        applicableSystems: formData.applicableSystemsStr
+          ? formData.applicableSystemsStr.split(",").map((s) => s.trim()).filter(Boolean)
+          : ["General"],
+        evidenceMetadata: {
+          documents: formData.documentsStr
+            ? formData.documentsStr.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+          standards: formData.standardsStr
+            ? formData.standardsStr.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
+          testReports: []
+        }
+      };
+
+      const res = await fetch("/api/precedents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setFormSuccess(true);
+        setFormData({
+          title: "",
+          type: "FAILURE",
+          description: "",
+          rootCause: "",
+          correctiveAction: "",
+          resolutionStatus: "RESOLVED",
+          confidenceScore: 0.95,
+          applicableSystemsStr: "",
+          documentsStr: "",
+          standardsStr: ""
+        });
+        
+        // Reload list
+        await loadData();
+        
+        // Close modal after a brief moment
+        setTimeout(() => {
+          setIsFormOpen(false);
+          setFormSuccess(false);
+        }, 1200);
+      } else {
+        const errJson = await res.json();
+        setFormError(errJson.error || "Failed to submit precedent to the Truth Pipeline.");
+      }
+    } catch {
+      setFormError("A network error occurred while submitting.");
+    }
+  };
+
+  return (
+    <PageContainer>
+      <Stack gap={8}>
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="bg-amber-500/10 text-amber-500 flex size-8 items-center justify-center rounded-md border border-amber-500/20">
+                <History className="size-4" />
+              </span>
+              <h1 className="text-foreground text-3xl font-extrabold tracking-tight">The Precedent Engine</h1>
+            </div>
+            <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+              Synthesizes previous design baselines, historical engineering failures, corrective actions, and regulatory wisdom. 
+              Ensures institutional engineering memory compounds and stays completely auditable.
+            </p>
+          </div>
+          <Button
+            onClick={() => setIsFormOpen(true)}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-50 dark:hover:bg-zinc-200 dark:text-zinc-950 flex items-center gap-2 self-start md:self-auto rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-all"
+          >
+            <Plus className="size-4" />
+            <span>Record Precedent</span>
+          </Button>
+        </div>
+
+        {/* KPI Panel */}
+        <GridLayout columns={4} gap={4}>
+          <MetricCard
+            label="Historical Failure Records"
+            value={precedents.filter(p => p.type === "FAILURE").length}
+            icon={<AlertOctagon className="text-red-500 size-5" />}
+          />
+          <MetricCard
+            label="Validated Design Baselines"
+            value={precedents.filter(p => p.type === "SUCCESSFUL_DESIGN").length}
+            icon={<CheckCircle2 className="text-green-500 size-5" />}
+          />
+          <MetricCard
+            label="Regulatory & Standard Precedents"
+            value={precedents.filter(p => p.type === "REGULATORY_PRECEDENT").length}
+            icon={<FileCheck2 className="text-blue-500 size-5" />}
+          />
+          <MetricCard
+            label="Avg Assessment Confidence"
+            value={`${(precedents.reduce((acc, curr) => acc + curr.confidenceScore, 0) / (precedents.length || 1) * 100).toFixed(1)}%`}
+            icon={<ShieldCheck className="text-amber-500 size-5" />}
+          />
+        </GridLayout>
+
+        {/* Dynamic Verification Hub (Interactive Reasoner) */}
+        <div className="border-border bg-zinc-50/50 dark:bg-zinc-900/10 rounded-xl border p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Sparkles className="text-amber-500 size-4" />
+            <h3 className="text-foreground text-base font-bold tracking-tight">Design & System Precedent Reasoner</h3>
+            <span className="text-muted-foreground text-xs font-medium bg-muted rounded px-1.5 py-0.5 ml-auto">Deterministic Engine</span>
+          </div>
+          <p className="text-muted-foreground mb-6 max-w-xl text-xs leading-relaxed">
+            Verify a planned design element against historical precedents instantly. Enter a system, part name, or subsystem (e.g. &quot;fuel tank&quot;, &quot;alloy&quot;, &quot;guidance&quot;) to extract failures and compliance requirements.
+          </p>
+
+          <form onSubmit={handleVerify} className="flex gap-2">
+            <div className="relative flex-1">
+              <Layers className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <input
+                type="text"
+                value={verifySystem}
+                onChange={(e) => setVerifySystem(e.target.value)}
+                placeholder="Enter planned subsystem (e.g., 'cryogenic', 'titanium', 'actuator')..."
+                className="bg-background border-border text-foreground w-full rounded-lg border py-2.5 pr-4 pl-10 text-sm placeholder:text-muted-foreground/60 outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isVerifying || !verifySystem.trim()}
+              className="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold px-5 animate-pulse"
+            >
+              {isVerifying ? "Verifying..." : "Run Assessment"}
+            </Button>
+          </form>
+
+          {/* Verification Results Animation */}
+          <AnimatePresence mode="wait">
+            {verificationResult && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-6 border-t pt-5"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Risk Profile */}
+                  <div className="border border-dashed rounded-lg p-4 bg-background">
+                    <span className="text-xs text-muted-foreground block mb-2 font-mono">SYSTEM RISK PROFILE</span>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "size-2.5 rounded-full animate-ping",
+                        verificationResult.overallRisk === "HIGH" ? "bg-red-500" :
+                        verificationResult.overallRisk === "MEDIUM" ? "bg-amber-500" : "bg-green-500"
+                      )} />
+                      <span className="text-lg font-bold tracking-tight text-foreground">
+                        {verificationResult.overallRisk} RISK DETECTION
+                      </span>
+                    </div>
+                    <div className="mt-4 text-xs text-muted-foreground leading-relaxed">
+                      {verificationResult.matchedPrecedents.length} matched historical precedents detected in system memory.
+                    </div>
+                  </div>
+
+                  {/* Recommendations */}
+                  <div className="border border-dashed rounded-lg p-4 bg-background md:col-span-2">
+                    <span className="text-xs text-muted-foreground block mb-2 font-mono">DETERMINISTIC RECOMMENDATIONS</span>
+                    <ul className="space-y-2">
+                      {verificationResult.recommendations.map((rec, i) => (
+                        <li key={i} className="text-xs text-foreground flex gap-2 items-start">
+                          <CheckCircle2 className="text-green-500 size-4 shrink-0 mt-0.5" />
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-4 border-t pt-3">
+                      <span className="text-[10px] text-muted-foreground block mb-2 font-mono">MISSING EVIDENCE & SUBMISSION REQS</span>
+                      <ul className="space-y-1">
+                        {verificationResult.missingEvidence.map((ev, i) => (
+                          <li key={i} className="text-[11px] text-amber-600 dark:text-amber-400 flex gap-1.5 items-center">
+                            <AlertTriangle className="size-3 shrink-0 animate-bounce" />
+                            <span>{ev}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Ledger & Controls Section */}
+        <Section title="Institutional Precedent Ledger">
+          {/* Controls Bar */}
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search historical rationale, root causes, corrective actions..."
+                className="bg-background border-border text-foreground w-full rounded-lg border py-2 pr-4 pl-10 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="bg-background border-border text-foreground rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+              >
+                <option value="ALL">All Precedent Types</option>
+                <option value="FAILURE">Failure Cases</option>
+                <option value="SUCCESSFUL_DESIGN">Successful Designs</option>
+                <option value="REGULATORY_PRECEDENT">Regulations</option>
+                <option value="SUPPLIER_HISTORY">Supplier History</option>
+              </select>
+
+              <select
+                value={selectedSystem}
+                onChange={(e) => setSelectedSystem(e.target.value)}
+                className="bg-background border-border text-foreground rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="ALL">All Systems</option>
+                {systems.map((sys) => (
+                  <option key={sys} value={sys}>{sys}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Left Column: Ledger Table */}
+            <Panel padding="none" className="overflow-hidden flex-1 w-full">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-24">
+                  <LoadingSpinner />
+                </div>
+              ) : precedents.length === 0 ? (
+                <EmptyState
+                  icon={<History className="size-10 text-muted-foreground" />}
+                  title="No matched precedents"
+                  description="Refine your search parameters or submit a new custom precedent record."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b bg-zinc-50 dark:bg-zinc-900/50 text-xs font-mono text-muted-foreground uppercase tracking-wider">
+                        <th className="px-6 py-4 font-medium">Record Title</th>
+                        <th className="px-6 py-4 font-medium">Type</th>
+                        <th className="px-6 py-4 font-medium">Target Systems</th>
+                        <th className="px-6 py-4 font-medium">Confidence</th>
+                        <th className="px-6 py-4 font-medium">Verification Status</th>
+                        <th className="px-6 py-4 font-medium">Created At</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-sm">
+                      {precedents.map((prec) => (
+                        <tr
+                          key={prec.id}
+                          onClick={() => setSelectedPrecedent(prec)}
+                          className={cn(
+                            "cursor-pointer transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 group",
+                            selectedPrecedent?.id === prec.id ? "bg-amber-500/5 dark:bg-amber-500/5 border-l-2 border-l-amber-500" : ""
+                          )}
+                        >
+                          <td className="px-6 py-4 max-w-md">
+                            <div className="flex flex-col gap-1">
+                              <span className={cn(
+                                "font-semibold text-foreground text-sm transition-colors",
+                                selectedPrecedent?.id === prec.id ? "text-amber-500" : "group-hover:text-amber-500"
+                              )}>
+                                {prec.title}
+                              </span>
+                              <span className="text-xs text-muted-foreground line-clamp-2">
+                                {prec.description}
+                              </span>
+                              
+                              {prec.rootCause && (
+                                <div className="mt-2 bg-red-500/5 border border-red-500/10 rounded px-2.5 py-1.5 text-xs text-red-700 dark:text-red-400">
+                                  <span className="font-bold uppercase tracking-wider font-mono text-[9px] block mb-0.5">Root Cause</span>
+                                  {prec.rootCause}
+                                </div>
+                              )}
+
+                              {prec.correctiveAction && prec.correctiveAction !== "N/A - System baseline verified." && (
+                                <div className="mt-1 bg-green-500/5 border border-green-500/10 rounded px-2.5 py-1.5 text-xs text-green-700 dark:text-green-400">
+                                  <span className="font-bold uppercase tracking-wider font-mono text-[9px] block mb-0.5">Verifiable Corrective Action</span>
+                                  {prec.correctiveAction}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded text-[11px] font-mono font-semibold tracking-wide",
+                              prec.type === "FAILURE" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400" :
+                              prec.type === "SUCCESSFUL_DESIGN" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" :
+                              prec.type === "REGULATORY_PRECEDENT" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400" :
+                              "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-400"
+                            )}>
+                              {prec.type.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-wrap gap-1">
+                              {prec.applicableSystems.map((s) => (
+                                <span key={s} className="bg-muted text-foreground text-[10px] font-medium px-1.5 py-0.5 rounded">
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-xs">
+                            {(prec.confidenceScore * 100).toFixed(0)}%
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn(
+                              "inline-flex items-center gap-1.5 text-xs font-medium",
+                              prec.resolutionStatus === "RESOLVED" ? "text-green-600 dark:text-green-400" :
+                              prec.resolutionStatus === "MITIGATED" ? "text-amber-600 dark:text-amber-400" :
+                              "text-zinc-600 dark:text-zinc-400"
+                            )}>
+                              <span className={cn(
+                                "size-1.5 rounded-full",
+                                prec.resolutionStatus === "RESOLVED" ? "bg-green-500" :
+                                prec.resolutionStatus === "MITIGATED" ? "bg-amber-500" : "bg-zinc-500"
+                              )} />
+                              {prec.resolutionStatus}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-muted-foreground text-xs font-mono">
+                            {new Date(prec.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
+
+            {/* Right Column: Precedent Investigation Dashboard Detail Panel */}
+            <AnimatePresence mode="wait">
+              {selectedPrecedent && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full lg:w-[420px] shrink-0 border border-border bg-background rounded-xl p-5 shadow-lg relative"
+                >
+                  <button
+                    onClick={() => setSelectedPrecedent(null)}
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="size-4" />
+                  </button>
+
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bookmark className="text-amber-500 size-4" />
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-muted-foreground uppercase">
+                      PRECEDENT INVESTIGATION
+                    </span>
+                  </div>
+
+                  <h3 className="text-foreground text-base font-extrabold tracking-tight mb-2 pr-6">
+                    {selectedPrecedent.title}
+                  </h3>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-mono font-semibold tracking-wide uppercase",
+                      selectedPrecedent.type === "FAILURE" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400" :
+                      selectedPrecedent.type === "SUCCESSFUL_DESIGN" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" :
+                      selectedPrecedent.type === "REGULATORY_PRECEDENT" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400" :
+                      "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-400"
+                    )}>
+                      {selectedPrecedent.type.replace("_", " ")}
+                    </span>
+                    <span className="bg-muted text-muted-foreground text-[10px] font-mono px-2 py-0.5 rounded">
+                      ID: {selectedPrecedent.id}
+                    </span>
+                  </div>
+
+                  <p className="text-muted-foreground text-xs leading-relaxed mb-4 border-b pb-4">
+                    {selectedPrecedent.description}
+                  </p>
+
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                    {/* Explainability & Relevance */}
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        EXPLAINABILITY & RELEVANCE
+                      </span>
+                      <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3 text-xs leading-relaxed text-foreground">
+                        <span className="font-semibold block text-amber-600 dark:text-amber-400 mb-1">
+                          Relevance Rationale:
+                        </span>
+                        {selectedPrecedent.whyRelevant || "Retrieved based on standard system indexing metrics."}
+                      </div>
+                    </div>
+
+                    {/* Confidence & Evidence Strength Indicator */}
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
+                        DETERMINISTIC STRENGTH RATINGS
+                      </span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="border rounded-lg p-2.5 bg-zinc-50/50 dark:bg-zinc-900/30">
+                          <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-medium mb-1">
+                            <ShieldCheck className="size-3.5 text-amber-500" />
+                            <span>CONFIDENCE</span>
+                          </div>
+                          <span className="text-lg font-extrabold font-mono text-foreground">
+                            {(selectedPrecedent.confidenceScore * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="border rounded-lg p-2.5 bg-zinc-50/50 dark:bg-zinc-900/30">
+                          <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-medium mb-1">
+                            <ShieldAlert className="size-3.5 text-blue-500" />
+                            <span>EVIDENCE RATIO</span>
+                          </div>
+                          <span className="text-lg font-extrabold font-mono text-foreground">
+                            {((selectedPrecedent.evidenceStrength ?? selectedPrecedent.confidenceScore) * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Debunked Assumptions Rejected */}
+                    {selectedPrecedent.assumptionsRejected && selectedPrecedent.assumptionsRejected.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                          ASSUMPTIONS DEBUNKED & REJECTED
+                        </span>
+                        <div className="bg-red-500/5 border border-red-500/15 rounded-lg p-3">
+                          <ul className="space-y-1.5">
+                            {selectedPrecedent.assumptionsRejected.map((as, index) => (
+                              <li key={index} className="text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
+                                <span className="text-red-500 font-bold shrink-0 mt-0.5">✕</span>
+                                <span>{as}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Knowledge Graph Traversed Paths */}
+                    {selectedPrecedent.graphRelationshipsTraversed && selectedPrecedent.graphRelationshipsTraversed.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
+                          KNOWLEDGE GRAPH PATHS TRAVERSED
+                        </span>
+                        <div className="space-y-1">
+                          {selectedPrecedent.graphRelationshipsTraversed.map((path, idx) => (
+                            <div key={idx} className="bg-muted/40 rounded px-2.5 py-1.5 text-[11px] font-mono flex items-center gap-1.5 text-foreground leading-tight">
+                              <Network className="size-3.5 text-muted-foreground shrink-0" />
+                              <span>{path}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rule Engine Compliance Checks */}
+                    {selectedPrecedent.rulesEvaluated && selectedPrecedent.rulesEvaluated.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                          RULE ENGINE COMPLIANCE CHECKS
+                        </span>
+                        <div className="border border-dashed rounded-lg p-2.5 bg-zinc-50/20">
+                          <ul className="space-y-1.5">
+                            {selectedPrecedent.rulesEvaluated.map((re, i) => (
+                              <li key={i} className="text-[11px] text-foreground flex gap-2 items-start leading-relaxed">
+                                <CheckCircle2 className="text-green-500 size-3.5 shrink-0 mt-0.5" />
+                                <span>{re}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Evidence & Verification Documents */}
+                    {selectedPrecedent.evidenceMetadata && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
+                          VERIFIABLE EVIDENCE CHAINS
+                        </span>
+                        <div className="space-y-1.5">
+                          {selectedPrecedent.evidenceMetadata.documents?.map((doc) => (
+                            <div key={doc} className="flex items-center gap-2 text-xs text-foreground bg-zinc-50 dark:bg-zinc-900 border rounded px-2.5 py-1.5">
+                              <FileText className="size-3.5 text-blue-500" />
+                              <span className="font-medium truncate">{doc}</span>
+                              <span className="text-[9px] font-mono text-green-600 bg-green-500/10 px-1 py-0.2 rounded ml-auto">VERIFIED</span>
+                            </div>
+                          ))}
+                          {selectedPrecedent.evidenceMetadata.standards?.map((std) => (
+                            <div key={std} className="flex items-center gap-2 text-xs text-foreground bg-zinc-50 dark:bg-zinc-900 border rounded px-2.5 py-1.5">
+                              <GitBranch className="size-3.5 text-purple-500" />
+                              <span className="font-medium truncate">{std}</span>
+                              <span className="text-[9px] font-mono text-purple-600 bg-purple-500/10 px-1 py-0.2 rounded ml-auto">STANDARD</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Engineering Memory & Version Audit Trail */}
+                    {selectedPrecedent.auditTrail && selectedPrecedent.auditTrail.length > 0 && (
+                      <div className="border-t pt-4">
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-2 tracking-wider">
+                          MEMORY AUDIT TRAIL & SYSTEM EVENTS
+                        </span>
+                        <div className="relative border-l pl-3 space-y-3.5">
+                          {selectedPrecedent.auditTrail.map((log) => (
+                            <div key={log.id} className="relative text-xs">
+                              {/* Dot indicator */}
+                              <div className="absolute -left-[16.5px] top-1 size-2.5 bg-amber-500 rounded-full border border-background shadow-sm" />
+                              <div className="flex flex-col">
+                                <span className="font-bold text-foreground">
+                                  {log.action.replace("_", " ")}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
+                                  <Clock className="size-3" />
+                                  {new Date(log.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Section>
+      </Stack>
+
+      {/* Record Precedent Modal Form */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-background border-border w-full max-w-2xl overflow-hidden rounded-xl border p-6 shadow-xl"
+          >
+            <div className="mb-4 flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <Bookmark className="text-amber-500 size-5" />
+                <h2 className="text-foreground text-lg font-bold">Record Engineering Precedent</h2>
+              </div>
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="text-muted-foreground hover:text-foreground text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit} className="space-y-4">
+              {formError && (
+                <div className="bg-red-500/5 border border-red-500/20 text-red-700 dark:text-red-400 p-3 rounded-lg text-xs">
+                  {formError}
+                </div>
+              )}
+              {formSuccess && (
+                <div className="bg-green-500/5 border border-green-500/20 text-green-700 dark:text-green-400 p-3 rounded-lg text-xs">
+                  ✓ Precedent recorded successfully. Engineering memory updated.
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Precedent Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Flight 22 Actuator O-Ring Thermal Shrinkage"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Precedent Type *</label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value as PrecedentType })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="FAILURE">Failure / Incident Mode</option>
+                    <option value="SUCCESSFUL_DESIGN">Successful Design Baseline</option>
+                    <option value="REGULATORY_PRECEDENT">Regulatory Standard</option>
+                    <option value="SUPPLIER_HISTORY">Supplier Defect / History</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Applicable Systems (comma separated) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Fuel System, Propulsion"
+                    value={formData.applicableSystemsStr}
+                    onChange={(e) => setFormData({ ...formData, applicableSystemsStr: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-foreground text-xs font-semibold block mb-1">Problem Description / Abstract *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Provide a detailed abstract of the engineering precedent."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                />
+              </div>
+
+              {formData.type === "FAILURE" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-foreground text-xs font-semibold block mb-1">Root Cause Analysis</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Material embrittlement under extreme low temps..."
+                      value={formData.rootCause}
+                      onChange={(e) => setFormData({ ...formData, rootCause: e.target.value })}
+                      className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-foreground text-xs font-semibold block mb-1">Corrective Actions Required</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Mandate non-destructive ultrasound testing..."
+                      value={formData.correctiveAction}
+                      onChange={(e) => setFormData({ ...formData, correctiveAction: e.target.value })}
+                      className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Verification Status</label>
+                  <select
+                    value={formData.resolutionStatus}
+                    onChange={(e) => setFormData({ ...formData, resolutionStatus: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="MITIGATED">Mitigated</option>
+                    <option value="MONITORED">Monitored</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Confidence Weight</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    max="1"
+                    value={formData.confidenceScore}
+                    onChange={(e) => setFormData({ ...formData, confidenceScore: parseFloat(e.target.value) })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Linked Standard Tags</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. NASA-STD-5001"
+                    value={formData.standardsStr}
+                    onChange={(e) => setFormData({ ...formData, standardsStr: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setIsFormOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 px-5"
+                >
+                  Confirm & Write
+                </Button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </PageContainer>
+  );
+}

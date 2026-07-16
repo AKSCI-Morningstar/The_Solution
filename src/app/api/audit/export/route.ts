@@ -39,11 +39,20 @@ export async function GET(request: Request) {
       );
     }
 
+    interface AuditRow {
+      id: string;
+      action: string;
+      entity: string;
+      entityId: string | null;
+      createdAt: Date;
+      metadata: unknown;
+    }
+
     const rows = await listAuditEventsForExport(orgId, parsed.data);
     const header = ["id", "action", "entity", "entityId", "createdAt", "metadata"];
     const lines = [
       header.join(","),
-      ...rows.map((row) =>
+      ...rows.map((row: AuditRow) =>
         [
           row.id,
           row.action,

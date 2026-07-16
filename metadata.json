@@ -1,0 +1,6 @@
+{
+  "name": "Aᴷ: The Morningstar Solution",
+  "description": "Engineering Reality Platform - Verifying engineering truth through deterministic, evidence-based reasoning",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

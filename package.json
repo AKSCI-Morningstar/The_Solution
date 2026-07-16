@@ -4,7 +4,7 @@
   "private": true,
   "description": "Engineering Reality Platform - Verifying engineering truth through deterministic, evidence-based reasoning",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src/ tests/",
@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
     "mammoth": "^1.12.0",
+    "motion": "^12.42.2",
     "next": "16.2.10",
     "pdf-parse": "^2.4.5",
     "react": "19.2.4",
