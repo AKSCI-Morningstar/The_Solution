@@ -29,12 +29,6 @@ const STATUS_BADGE: Record<string, string> = {
   RETIRED: "secondary",
 };
 
-function ScoreBadge({ score }: { score?: number | null }) {
-  if (score == null) return <span className="text-muted-foreground text-xs">—</span>;
-  const color = score >= 80 ? "text-success" : score >= 50 ? "text-warning" : "text-destructive";
-  return <span className={color}>{score}</span>;
-}
-
 export function CapabilityViewer({ capabilities, onAdd, onDelete }: Props) {
   return (
     <Stack gap={3}>
@@ -64,10 +58,8 @@ export function CapabilityViewer({ capabilities, onAdd, onDelete }: Props) {
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Lead Time</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Quality</TableHead>
-              <TableHead>Delivery</TableHead>
-              <TableHead>Overall</TableHead>
               {onDelete && <TableHead className="w-10" />}
             </TableRow>
           </TableHeader>
@@ -95,6 +87,11 @@ export function CapabilityViewer({ capabilities, onAdd, onDelete }: Props) {
                   <span className="text-muted-foreground text-xs">{cap.category ?? "—"}</span>
                 </TableCell>
                 <TableCell>
+                  <span className="text-muted-foreground text-xs">
+                    {cap.leadTimeDays ? `${cap.leadTimeDays} days` : "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
                   <Badge
                     variant={
                       (STATUS_BADGE[cap.status] ?? "secondary") as
@@ -104,15 +101,6 @@ export function CapabilityViewer({ capabilities, onAdd, onDelete }: Props) {
                   >
                     {cap.status}
                   </Badge>
-                </TableCell>
-                <TableCell>
-                  <ScoreBadge score={cap.qualityScore} />
-                </TableCell>
-                <TableCell>
-                  <ScoreBadge score={cap.deliveryScore} />
-                </TableCell>
-                <TableCell>
-                  <ScoreBadge score={cap.overallScore} />
                 </TableCell>
                 {onDelete && (
                   <TableCell>

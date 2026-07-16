@@ -1,8 +1,93 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { NotFoundError } from "@/shared/errors";
 import { recordAuditEvent } from "@/server/audit/audit-service";
 import type { CreateSupplierInput, UpdateSupplierInput, SupplierFilterInput } from "./validation";
+
+function extractMetadata(input: any, existingMetadata?: any) {
+  const meta: Record<string, any> = {
+    ...(existingMetadata as Record<string, any> || {}),
+    ...(input.metadata as Record<string, any> || {}),
+  };
+  const fields = [
+    "tier",
+    "leadTimeDays",
+    "riskLevel",
+    "riskScore",
+    "lastAssessmentDate",
+    "nextAssessmentDate",
+    "contractStartDate",
+    "contractEndDate",
+    "contractValue",
+    "annualRevenue",
+    "currency",
+    "paymentTerms",
+    "shippingTerms",
+    "employeeCount",
+    "overallRating",
+    "qualityRating",
+    "deliveryRating",
+    "costRating",
+    "complianceRating",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "state",
+    "postalCode",
+    "country",
+    "notes",
+  ];
+  for (const f of fields) {
+    if (input[f] !== undefined) {
+      meta[f] = input[f];
+    }
+  }
+  return meta;
+}
+
+export function mapSupplierToDTO(supplier: any): any {
+  if (!supplier) return null;
+  const metadata = (supplier.metadata as Record<string, any>) || {};
+  return {
+    ...supplier,
+    // Map JSON arrays/objects safely
+    naicsCodes: Array.isArray(supplier.naicsCodes) ? supplier.naicsCodes : [],
+    industrySectors: Array.isArray(supplier.industrySectors) ? supplier.industrySectors : [],
+    supportedPrograms: Array.isArray(supplier.supportedPrograms) ? supplier.supportedPrograms : [],
+    locations: Array.isArray(supplier.locations) ? supplier.locations : [],
+    tags: Array.isArray(supplier.tags) ? supplier.tags : [],
+    labels: (supplier.labels as Record<string, string>) || {},
+
+    // Map metadata fields
+    tier: metadata.tier ?? null,
+    leadTimeDays: metadata.leadTimeDays ?? null,
+    riskLevel: metadata.riskLevel ?? "LOW",
+    riskScore: metadata.riskScore ?? null,
+    lastAssessmentDate: metadata.lastAssessmentDate ?? null,
+    nextAssessmentDate: metadata.nextAssessmentDate ?? null,
+    contractStartDate: metadata.contractStartDate ?? null,
+    contractEndDate: metadata.contractEndDate ?? null,
+    contractValue: metadata.contractValue ?? null,
+    annualRevenue: metadata.annualRevenue ?? null,
+    currency: metadata.currency ?? "USD",
+    paymentTerms: metadata.paymentTerms ?? null,
+    shippingTerms: metadata.shippingTerms ?? null,
+    employeeCount: metadata.employeeCount ?? null,
+    overallRating: metadata.overallRating ?? null,
+    qualityRating: metadata.qualityRating ?? null,
+    deliveryRating: metadata.deliveryRating ?? null,
+    costRating: metadata.costRating ?? null,
+    complianceRating: metadata.complianceRating ?? null,
+    addressLine1: metadata.addressLine1 ?? null,
+    addressLine2: metadata.addressLine2 ?? null,
+    city: metadata.city ?? null,
+    state: metadata.state ?? null,
+    postalCode: metadata.postalCode ?? null,
+    country: metadata.country ?? null,
+    notes: metadata.notes ?? null,
+  };
+}
 
 export async function createSupplier(
   organizationId: string,
@@ -21,6 +106,8 @@ export async function createSupplier(
   if (existing && !existing.deletedAt) {
     throw new Error(`Supplier with identifier ${input.identifier} already exists`);
   }
+
+  const computedMetadata = extractMetadata(input);
 
   const supplier = await prisma.supplier.create({
     data: {
@@ -43,7 +130,7 @@ export async function createSupplier(
       status: input.status,
       tags: input.tags ?? Prisma.DbNull,
       labels: input.labels ?? Prisma.DbNull,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined,
+      metadata: computedMetadata as Prisma.InputJsonValue,
       createdById: userId,
       updatedById: userId,
     },
@@ -54,7 +141,7 @@ export async function createSupplier(
     name: supplier.name,
   });
 
-  return supplier;
+  return mapSupplierToDTO(supplier);
 }
 
 export async function getSupplier(supplierId: string, organizationId: string) {
@@ -82,7 +169,7 @@ export async function getSupplier(supplierId: string, organizationId: string) {
     },
   });
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
-  return supplier;
+  return mapSupplierToDTO(supplier);
 }
 
 export async function listSuppliers(organizationId: string, filters: SupplierFilterInput) {
@@ -118,7 +205,9 @@ export async function listSuppliers(organizationId: string, filters: SupplierFil
     prisma.supplier.count({ where }),
   ]);
 
-  return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+  const mappedData = data.map(mapSupplierToDTO);
+
+  return { data: mappedData, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 }
 
 export async function updateSupplier(
@@ -132,7 +221,13 @@ export async function updateSupplier(
   });
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
-  const data: Record<string, unknown> = { updatedById: userId };
+  const computedMetadata = extractMetadata(input, supplier.metadata);
+
+  const data: Record<string, unknown> = {
+    updatedById: userId,
+    metadata: computedMetadata as Prisma.InputJsonValue,
+  };
+  
   const fields: (keyof UpdateSupplierInput)[] = [
     "supplierType",
     "identifier",
@@ -161,7 +256,6 @@ export async function updateSupplier(
   for (const field of jsonFields) {
     if (input[field] !== undefined) data[field] = input[field] as Prisma.InputJsonValue;
   }
-  if (input.metadata !== undefined) data.metadata = input.metadata as Prisma.InputJsonValue;
 
   const updated = await prisma.supplier.update({ where: { id: supplierId }, data });
 
@@ -169,7 +263,7 @@ export async function updateSupplier(
     changes: Object.keys(input),
   });
 
-  return updated;
+  return mapSupplierToDTO(updated);
 }
 
 export async function deleteSupplier(supplierId: string, organizationId: string, userId: string) {
@@ -189,7 +283,7 @@ export async function deleteSupplier(supplierId: string, organizationId: string,
 }
 
 export async function searchSuppliers(organizationId: string, query: string, limit = 20) {
-  return prisma.supplier.findMany({
+  const suppliers = await prisma.supplier.findMany({
     where: {
       organizationId,
       deletedAt: null,
@@ -202,6 +296,7 @@ export async function searchSuppliers(organizationId: string, query: string, lim
     },
     take: limit,
     orderBy: { name: "asc" },
-    select: { id: true, name: true, identifier: true, supplierType: true, status: true },
+    select: { id: true, name: true, identifier: true, supplierType: true, status: true, metadata: true },
   });
+  return suppliers.map(mapSupplierToDTO);
 }

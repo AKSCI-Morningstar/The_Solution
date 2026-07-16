@@ -120,20 +120,20 @@ export function SupplierList({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-foreground text-sm font-medium">{supplier.name}</span>
-                        {supplier.industry && (
-                          <span className="text-muted-foreground text-xs">{supplier.industry}</span>
+                        {supplier.industrySectors && supplier.industrySectors.length > 0 && (
+                          <span className="text-muted-foreground text-xs">{supplier.industrySectors[0]}</span>
                         )}
                       </div>
                     </Link>
                   </TableCell>
                   <TableCell>
                     <code className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
-                      {supplier.supplierCode}
+                      {supplier.identifier}
                     </code>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" size="sm">
-                      {SUPPLIER_TYPE_LABELS[supplier.type] ?? supplier.type}
+                      {SUPPLIER_TYPE_LABELS[supplier.supplierType] ?? supplier.supplierType}
                     </Badge>
                   </TableCell>
                   <TableCell>

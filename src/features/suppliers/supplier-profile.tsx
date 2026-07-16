@@ -1,8 +1,9 @@
 "use client";
 
-import { Building2, MapPin, Globe, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { Building2, MapPin, Globe, ExternalLink, Edit } from "lucide-react";
 import { cn } from "@/shared/utils";
-import { Badge, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { Badge, Card, CardHeader, CardTitle, CardContent, Button } from "@/components/ui";
 import { Panel, Stack } from "@/components/layout";
 import { SUPPLIER_TYPE_LABELS, SUPPLIER_STATUS_LABELS } from "@/server/suppliers/constants";
 import type { SupplierDTO } from "./types";
@@ -11,6 +12,7 @@ import { CapabilityViewer } from "./capability-viewer";
 import { FacilityExplorer } from "./facility-explorer";
 import { ContactList } from "./contact-list";
 import { RelationshipGraph } from "./relationship-graph";
+import { SupplierEditor } from "./supplier-editor";
 
 interface Props {
   supplier: SupplierDTO;
@@ -60,40 +62,78 @@ function RatingBar({
   );
 }
 
-export function SupplierProfile({ supplier }: Props) {
+export function SupplierProfile({ supplier: initialSupplier }: Props) {
+  const [supplier, setSupplier] = useState<SupplierDTO>(initialSupplier);
+  const [isEditing, setIsEditing] = useState(false);
+
+  if (isEditing) {
+    return (
+      <SupplierEditor
+        supplier={supplier}
+        onCancel={() => setIsEditing(false)}
+        onSuccess={(updatedSupplier) => {
+          setSupplier(updatedSupplier);
+          setIsEditing(false);
+        }}
+      />
+    );
+  }
+
+  // Combine outgoing and incoming relationships for ease of display in RelationshipGraph
+  const relationships = [
+    ...(supplier.outgoingRelationships ?? []).map((rel) => ({
+      ...rel,
+      direction: "OUTBOUND" as const,
+      relatedSupplier: rel.targetSupplier,
+    })),
+    ...(supplier.incomingRelationships ?? []).map((rel) => ({
+      ...rel,
+      direction: "INBOUND" as const,
+      relatedSupplier: rel.sourceSupplier,
+    })),
+  ];
+
   return (
     <Stack gap={6}>
-      <div className="flex items-start gap-4">
-        <div className="bg-muted flex size-14 items-center justify-center rounded-xl">
-          <Building2 className="text-muted-foreground size-7" />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-foreground text-2xl font-bold tracking-tight">{supplier.name}</h1>
-            <Badge
-              variant={
-                (STATUS_BADGE[supplier.status] ?? "secondary") as
-                  "success" | "warning" | "secondary" | "destructive"
-              }
-            >
-              {SUPPLIER_STATUS_LABELS[supplier.status] ?? supplier.status}
-            </Badge>
-            <Badge variant="secondary">
-              {SUPPLIER_TYPE_LABELS[supplier.type] ?? supplier.type}
-            </Badge>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="bg-muted flex size-14 items-center justify-center rounded-xl">
+            <Building2 className="text-muted-foreground size-7" />
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{supplier.supplierCode}</code>
-            {supplier.tier && <span>Tier {supplier.tier}</span>}
-            {supplier.industry && <span>{supplier.industry}</span>}
-            {(supplier.city || supplier.country) && (
-              <span className="flex items-center gap-1">
-                <MapPin className="size-3" />
-                {[supplier.city, supplier.state, supplier.country].filter(Boolean).join(", ")}
-              </span>
-            )}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-foreground text-2xl font-bold tracking-tight">{supplier.name}</h1>
+              <Badge
+                variant={
+                  (STATUS_BADGE[supplier.status] ?? "secondary") as
+                    "success" | "warning" | "secondary" | "destructive"
+                }
+              >
+                {SUPPLIER_STATUS_LABELS[supplier.status] ?? supplier.status}
+              </Badge>
+              <Badge variant="secondary">
+                {SUPPLIER_TYPE_LABELS[supplier.supplierType] ?? supplier.supplierType}
+              </Badge>
+            </div>
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+              <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{supplier.identifier}</code>
+              {supplier.tier && <span>Tier {supplier.tier}</span>}
+              {supplier.industrySectors && supplier.industrySectors.length > 0 && (
+                <span>{supplier.industrySectors.join(", ")}</span>
+              )}
+              {(supplier.city || supplier.country) && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-3" />
+                  {[supplier.city, supplier.state, supplier.country].filter(Boolean).join(", ")}
+                </span>
+              )}
+            </div>
           </div>
         </div>
+        <Button onClick={() => setIsEditing(true)} size="sm" variant="secondary" className="shrink-0">
+          <Edit className="mr-1.5 size-4" />
+          Edit
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -125,7 +165,7 @@ export function SupplierProfile({ supplier }: Props) {
 
           <Panel padding="md">
             <RelationshipGraph
-              relationships={supplier.relationships ?? []}
+              relationships={relationships}
               supplierId={supplier.id}
             />
           </Panel>
@@ -160,11 +200,15 @@ export function SupplierProfile({ supplier }: Props) {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">DUNS</span>
-                  <span className="text-foreground text-xs">{supplier.dunsNumber ?? "—"}</span>
+                  <span className="text-foreground text-xs">{supplier.duns ?? "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">NAICS</span>
-                  <span className="text-foreground text-xs">{supplier.naicsCode ?? "—"}</span>
+                  <span className="text-foreground text-xs">
+                    {supplier.naicsCodes && supplier.naicsCodes.length > 0
+                      ? supplier.naicsCodes.join(", ")
+                      : "—"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">Payment Terms</span>
@@ -270,8 +314,8 @@ export function SupplierProfile({ supplier }: Props) {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">Onboarded</span>
                   <span className="text-foreground text-xs">
-                    {supplier.onboardingDate
-                      ? new Date(supplier.onboardingDate).toLocaleDateString()
+                    {supplier.createdAt
+                      ? new Date(supplier.createdAt).toLocaleDateString()
                       : "—"}
                   </span>
                 </div>
@@ -281,7 +325,7 @@ export function SupplierProfile({ supplier }: Props) {
 
           {supplier.website && (
             <a
-              href={supplier.website}
+              href={supplier.website.startsWith("http") ? supplier.website : `https://${supplier.website}`}
               target="_blank"
               rel="noopener noreferrer"
               className="border-border hover:bg-surface-hover text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors"

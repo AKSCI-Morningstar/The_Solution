@@ -40,65 +40,68 @@ export function FacilityExplorer({ facilities, onAdd, onDelete }: Props) {
         </Panel>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {facilities.map((facility) => (
-            <Card
-              key={facility.id}
-              className="cursor-pointer"
-              onClick={() => setExpandedId(expandedId === facility.id ? null : facility.id)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-col">
-                    <CardTitle className="text-sm">{facility.name}</CardTitle>
-                    <span className="text-muted-foreground text-xs">
-                      {FACILITY_TYPE_LABELS[facility.type] ?? facility.type}
-                    </span>
+          {facilities.map((facility) => {
+            const yearEstablished = facility.metadata?.yearEstablished as string | number | undefined;
+            return (
+              <Card
+                key={facility.id}
+                className="cursor-pointer"
+                onClick={() => setExpandedId(expandedId === facility.id ? null : facility.id)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <CardTitle className="text-sm">{facility.name}</CardTitle>
+                      <span className="text-muted-foreground text-xs">
+                        {FACILITY_TYPE_LABELS[facility.type] ?? facility.type}
+                      </span>
+                    </div>
+                    {onDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(facility.id);
+                        }}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
                   </div>
-                  {onDelete && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(facility.id);
-                      }}
-                      className="text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                </CardHeader>
+                <CardContent className="pb-3">
+                  {(facility.city || facility.country) && (
+                    <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                      <MapPin className="size-3" />
+                      {[facility.city, facility.state, facility.country].filter(Boolean).join(", ")}
+                    </div>
                   )}
-                </div>
-              </CardHeader>
-              <CardContent className="pb-3">
-                {(facility.city || facility.country) && (
-                  <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                    <MapPin className="size-3" />
-                    {[facility.city, facility.state, facility.country].filter(Boolean).join(", ")}
-                  </div>
-                )}
-                {expandedId === facility.id && (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {facility.employeeCount != null && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <Users className="size-3" />
-                        {facility.employeeCount} employees
-                      </div>
-                    )}
-                    {facility.squareFootage != null && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <Maximize2 className="size-3" />
-                        {facility.squareFootage.toLocaleString()} sq ft
-                      </div>
-                    )}
-                    {facility.yearEstablished != null && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <CalendarDays className="size-3" />
-                        Est. {facility.yearEstablished}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  {expandedId === facility.id && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {facility.employees != null && (
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <Users className="size-3" />
+                          {facility.employees} employees
+                        </div>
+                      )}
+                      {facility.areaSqFt != null && (
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <Maximize2 className="size-3" />
+                          {facility.areaSqFt.toLocaleString()} sq ft
+                        </div>
+                      )}
+                      {yearEstablished != null && (
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                          <CalendarDays className="size-3" />
+                          Est. {yearEstablished}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </Stack>

@@ -20,13 +20,6 @@ interface Props {
   onDelete?: (id: string) => void;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: "success",
-  INACTIVE: "secondary",
-  PENDING: "warning",
-  TERMINATED: "destructive",
-};
-
 export function RelationshipGraph({ relationships, onDelete }: Props) {
   return (
     <Stack gap={3}>
@@ -47,8 +40,9 @@ export function RelationshipGraph({ relationships, onDelete }: Props) {
             <TableRow>
               <TableHead>Type</TableHead>
               <TableHead>Direction</TableHead>
-              <TableHead>Target</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Target Supplier</TableHead>
+              <TableHead>Program</TableHead>
+              <TableHead>Contract Ref</TableHead>
               <TableHead>Start Date</TableHead>
               {onDelete && <TableHead className="w-10" />}
             </TableRow>
@@ -57,7 +51,7 @@ export function RelationshipGraph({ relationships, onDelete }: Props) {
             {relationships.map((rel) => (
               <TableRow key={rel.id}>
                 <TableCell>
-                  <span className="text-foreground text-sm">
+                  <span className="text-foreground text-sm font-medium">
                     {RELATIONSHIP_TYPE_LABELS[rel.relationshipType] ?? rel.relationshipType}
                   </span>
                 </TableCell>
@@ -71,24 +65,15 @@ export function RelationshipGraph({ relationships, onDelete }: Props) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <span className="text-muted-foreground text-xs">
-                    {rel.relatedSupplierId
-                      ? `Supplier: ${rel.relatedSupplierId.slice(0, 8)}`
-                      : rel.relatedOrganizationId
-                        ? `Org: ${rel.relatedOrganizationId.slice(0, 8)}`
-                        : "—"}
+                  <span className="text-foreground text-xs font-medium">
+                    {rel.relatedSupplier ? rel.relatedSupplier.name : "—"}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={
-                      (STATUS_BADGE[rel.status] ?? "secondary") as
-                        "success" | "warning" | "destructive" | "secondary"
-                    }
-                    size="sm"
-                  >
-                    {rel.status}
-                  </Badge>
+                  <span className="text-muted-foreground text-xs">{rel.program ?? "—"}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-muted-foreground text-xs">{rel.contractReference ?? "—"}</span>
                 </TableCell>
                 <TableCell>
                   <span className="text-muted-foreground text-xs">

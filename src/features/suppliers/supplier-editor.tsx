@@ -15,89 +15,94 @@ import type { SupplierDTO } from "./types";
 
 interface FormData {
   name: string;
-  supplierCode: string;
-  type: string;
+  identifier: string;
+  supplierType: string;
   status: string;
   tier: string;
   description: string;
   website: string;
   taxId: string;
-  industry: string;
+  industrySectors: string;
   employeeCount: string;
   annualRevenue: string;
   currency: string;
   paymentTerms: string;
   shippingTerms: string;
+  leadTimeDays: string;
   addressLine1: string;
   addressLine2: string;
   city: string;
   state: string;
   postalCode: string;
   country: string;
-  dunsNumber: string;
-  naicsCode: string;
+  duns: string;
+  naicsCodes: string;
   riskLevel: string;
   notes: string;
 }
 
 const DEFAULT_FORM: FormData = {
   name: "",
-  supplierCode: "",
-  type: "SUPPLIER",
+  identifier: "",
+  supplierType: "SUPPLIER",
   status: "PENDING_REVIEW",
   tier: "",
   description: "",
   website: "",
   taxId: "",
-  industry: "",
+  industrySectors: "",
   employeeCount: "",
   annualRevenue: "",
   currency: "USD",
   paymentTerms: "",
   shippingTerms: "",
+  leadTimeDays: "",
   addressLine1: "",
   addressLine2: "",
   city: "",
   state: "",
   postalCode: "",
   country: "",
-  dunsNumber: "",
-  naicsCode: "",
+  duns: "",
+  naicsCodes: "",
   riskLevel: "LOW",
   notes: "",
 };
 
 interface Props {
   supplier?: SupplierDTO;
+  onCancel?: () => void;
+  onSuccess?: (supplier: SupplierDTO) => void;
 }
 
-export function SupplierEditor({ supplier }: Props) {
+export function SupplierEditor({ supplier, onCancel, onSuccess }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormData>(() => {
     if (!supplier) return DEFAULT_FORM;
     return {
       name: supplier.name,
-      supplierCode: supplier.supplierCode,
-      type: supplier.type,
+      identifier: supplier.identifier,
+      supplierType: supplier.supplierType,
       status: supplier.status,
       tier: supplier.tier ?? "",
       description: supplier.description ?? "",
       website: supplier.website ?? "",
       taxId: supplier.taxId ?? "",
-      industry: supplier.industry ?? "",
+      industrySectors: supplier.industrySectors?.join(", ") ?? "",
       employeeCount: supplier.employeeCount?.toString() ?? "",
       annualRevenue: supplier.annualRevenue ?? "",
       currency: supplier.currency ?? "USD",
       paymentTerms: supplier.paymentTerms ?? "",
       shippingTerms: supplier.shippingTerms ?? "",
+      leadTimeDays: supplier.leadTimeDays?.toString() ?? "",
       addressLine1: supplier.addressLine1 ?? "",
       addressLine2: supplier.addressLine2 ?? "",
       city: supplier.city ?? "",
       state: supplier.state ?? "",
       postalCode: supplier.postalCode ?? "",
       country: supplier.country ?? "",
-      dunsNumber: supplier.dunsNumber ?? "",
-      naicsCode: supplier.naicsCode ?? "",
+      duns: supplier.duns ?? "",
+      naicsCodes: supplier.naicsCodes?.join(", ") ?? "",
       riskLevel: supplier.riskLevel ?? "LOW",
       notes: supplier.notes ?? "",
     };
@@ -123,19 +128,20 @@ export function SupplierEditor({ supplier }: Props) {
       description: form.description || undefined,
       website: form.website || undefined,
       taxId: form.taxId || undefined,
-      industry: form.industry || undefined,
+      industrySectors: form.industrySectors ? form.industrySectors.split(",").map(s => s.trim()).filter(Boolean) : [],
       annualRevenue: form.annualRevenue || undefined,
       currency: form.currency || undefined,
       paymentTerms: form.paymentTerms || undefined,
       shippingTerms: form.shippingTerms || undefined,
+      leadTimeDays: form.leadTimeDays ? parseInt(form.leadTimeDays, 10) : undefined,
       addressLine1: form.addressLine1 || undefined,
       addressLine2: form.addressLine2 || undefined,
       city: form.city || undefined,
       state: form.state || undefined,
       postalCode: form.postalCode || undefined,
       country: form.country || undefined,
-      dunsNumber: form.dunsNumber || undefined,
-      naicsCode: form.naicsCode || undefined,
+      duns: form.duns || undefined,
+      naicsCodes: form.naicsCodes ? form.naicsCodes.split(",").map(s => s.trim()).filter(Boolean) : [],
       riskLevel: form.riskLevel || undefined,
       notes: form.notes || undefined,
     };
@@ -156,8 +162,12 @@ export function SupplierEditor({ supplier }: Props) {
       }
 
       const json = await res.json();
-      router.push(`/suppliers/${json.data.id}`);
-      router.refresh();
+      if (onSuccess) {
+        onSuccess(json.data);
+      } else {
+        router.push(`/suppliers/${json.data.id}`);
+        router.refresh();
+      }
     } catch {
       setError("Network error");
     } finally {
@@ -180,11 +190,15 @@ export function SupplierEditor({ supplier }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={() => router.back()}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onCancel ? onCancel : () => router.back()}
+            >
               <X className="mr-1.5 size-4" />
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving || !form.name || !form.supplierCode}>
+            <Button type="submit" disabled={isSaving || !form.name || !form.identifier}>
               {isSaving ? (
                 <Loader2 className="mr-1.5 size-4 animate-spin" />
               ) : (
@@ -218,16 +232,16 @@ export function SupplierEditor({ supplier }: Props) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">Supplier Code *</label>
                 <Input
-                  value={form.supplierCode}
-                  onChange={(e) => updateField("supplierCode", e.target.value)}
+                  value={form.identifier}
+                  onChange={(e) => updateField("identifier", e.target.value)}
                   required
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">Type</label>
                 <select
-                  value={form.type}
-                  onChange={(e) => updateField("type", e.target.value)}
+                  value={form.supplierType}
+                  onChange={(e) => updateField("supplierType", e.target.value)}
                   className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
                 >
                   {SUPPLIER_TYPES.map((t) => (
@@ -256,10 +270,11 @@ export function SupplierEditor({ supplier }: Props) {
                 <Input value={form.tier} onChange={(e) => updateField("tier", e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Industry</label>
+                <label className="text-foreground text-xs font-medium">Industry Sectors</label>
                 <Input
-                  value={form.industry}
-                  onChange={(e) => updateField("industry", e.target.value)}
+                  value={form.industrySectors}
+                  placeholder="e.g. Aerospace, Manufacturing (comma-separated)"
+                  onChange={(e) => updateField("industrySectors", e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -336,15 +351,16 @@ export function SupplierEditor({ supplier }: Props) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">DUNS Number</label>
                 <Input
-                  value={form.dunsNumber}
-                  onChange={(e) => updateField("dunsNumber", e.target.value)}
+                  value={form.duns}
+                  onChange={(e) => updateField("duns", e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">NAICS Code</label>
+                <label className="text-foreground text-xs font-medium">NAICS Codes</label>
                 <Input
-                  value={form.naicsCode}
-                  onChange={(e) => updateField("naicsCode", e.target.value)}
+                  value={form.naicsCodes}
+                  placeholder="e.g. 336411, 336413 (comma-separated)"
+                  onChange={(e) => updateField("naicsCodes", e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -395,6 +411,14 @@ export function SupplierEditor({ supplier }: Props) {
                 <Input
                   value={form.shippingTerms}
                   onChange={(e) => updateField("shippingTerms", e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-foreground text-xs font-medium">Lead Time (Days)</label>
+                <Input
+                  type="number"
+                  value={form.leadTimeDays}
+                  onChange={(e) => updateField("leadTimeDays", e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
