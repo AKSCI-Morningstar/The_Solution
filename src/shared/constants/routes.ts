@@ -45,50 +45,22 @@ export { isGroup };
 
 export const SIDEBAR_NAV: SidebarNavEntry[] = [
   {
-    label: "Dashboard",
+    label: "Workspace",
     href: ROUTES.dashboard,
     icon: "LayoutDashboard",
   },
   {
-    label: "Workspace",
+    label: "Engineering Data",
     icon: "Layers",
     items: [
       { label: "Documents", href: ROUTES.documents, icon: "FileText" },
-      { label: "Ingestion", href: ROUTES.ingestion, icon: "UploadCloud" },
-      { label: "Search", href: ROUTES.search, icon: "Search" },
-      { label: "Reports", href: ROUTES.reports, icon: "BarChart3" },
+      { label: "Suppliers", href: ROUTES.suppliers, icon: "Truck" },
     ],
-  },
-  {
-    label: "Engineering",
-    icon: "Cog",
-    items: [
-      { label: "Entities", href: ROUTES.entities, icon: "Tags" },
-      { label: "Knowledge Graph", href: ROUTES["knowledge-graph"], icon: "GitBranch" },
-      { label: "Evidence", href: ROUTES.evidence, icon: "ShieldCheck" },
-      { label: "Rules", href: ROUTES.rules, icon: "BookCheck" },
-      { label: "Contradictions", href: ROUTES.contradictions, icon: "AlertTriangle" },
-      { label: "Orchestrator", href: ROUTES.orchestrator, icon: "Workflow" },
-      { label: "Reality Engine", href: ROUTES.reality, icon: "ScanEye" },
-      { label: "Precedent Engine", href: ROUTES.precedents, icon: "ScrollText" },
-      { label: "Simulation", href: ROUTES.simulation, icon: "FlaskConical" },
-    ],
-  },
-  {
-    label: "Supply Chain",
-    icon: "Truck",
-    items: [{ label: "Suppliers", href: ROUTES.suppliers, icon: "Truck" }],
-  },
-  {
-    label: "Intelligence",
-    icon: "Brain",
-    items: [{ label: "AI Workspace", href: ROUTES.ai, icon: "Brain" }],
   },
   {
     label: "Administration",
     icon: "Settings",
     items: [
-      { label: "Organizations", href: ROUTES.organizations, icon: "Building2" },
       { label: "Settings", href: ROUTES.settings, icon: "Settings" },
       { label: "Audit Log", href: ROUTES.audit, icon: "ScrollText" },
       { label: "Notifications", href: ROUTES.notifications, icon: "Bell" },
