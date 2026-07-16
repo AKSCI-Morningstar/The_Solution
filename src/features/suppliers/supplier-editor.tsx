@@ -15,56 +15,40 @@ import type { SupplierDTO } from "./types";
 
 interface FormData {
   name: string;
-  supplierCode: string;
-  type: string;
+  identifier: string;
+  supplierType: string;
   status: string;
-  tier: string;
   description: string;
   website: string;
   taxId: string;
-  industry: string;
-  employeeCount: string;
-  annualRevenue: string;
-  currency: string;
-  paymentTerms: string;
-  shippingTerms: string;
-  addressLine1: string;
-  addressLine2: string;
+  industrySectors: string;
+  address: string;
   city: string;
   state: string;
-  postalCode: string;
   country: string;
-  dunsNumber: string;
-  naicsCode: string;
-  riskLevel: string;
-  notes: string;
+  duns: string;
+  naicsCodes: string;
+  riskNotes: string;
+  engineeringNotes: string;
 }
 
 const DEFAULT_FORM: FormData = {
   name: "",
-  supplierCode: "",
-  type: "SUPPLIER",
+  identifier: "",
+  supplierType: "SUPPLIER",
   status: "PENDING_REVIEW",
-  tier: "",
   description: "",
   website: "",
   taxId: "",
-  industry: "",
-  employeeCount: "",
-  annualRevenue: "",
-  currency: "USD",
-  paymentTerms: "",
-  shippingTerms: "",
-  addressLine1: "",
-  addressLine2: "",
+  industrySectors: "",
+  address: "",
   city: "",
   state: "",
-  postalCode: "",
   country: "",
-  dunsNumber: "",
-  naicsCode: "",
-  riskLevel: "LOW",
-  notes: "",
+  duns: "",
+  naicsCodes: "",
+  riskNotes: "",
+  engineeringNotes: "",
 };
 
 interface Props {
@@ -77,29 +61,21 @@ export function SupplierEditor({ supplier }: Props) {
     if (!supplier) return DEFAULT_FORM;
     return {
       name: supplier.name,
-      supplierCode: supplier.supplierCode,
-      type: supplier.type,
+      identifier: supplier.identifier,
+      supplierType: supplier.supplierType,
       status: supplier.status,
-      tier: supplier.tier ?? "",
       description: supplier.description ?? "",
       website: supplier.website ?? "",
       taxId: supplier.taxId ?? "",
-      industry: supplier.industry ?? "",
-      employeeCount: supplier.employeeCount?.toString() ?? "",
-      annualRevenue: supplier.annualRevenue ?? "",
-      currency: supplier.currency ?? "USD",
-      paymentTerms: supplier.paymentTerms ?? "",
-      shippingTerms: supplier.shippingTerms ?? "",
-      addressLine1: supplier.addressLine1 ?? "",
-      addressLine2: supplier.addressLine2 ?? "",
-      city: supplier.city ?? "",
-      state: supplier.state ?? "",
-      postalCode: supplier.postalCode ?? "",
-      country: supplier.country ?? "",
-      dunsNumber: supplier.dunsNumber ?? "",
-      naicsCode: supplier.naicsCode ?? "",
-      riskLevel: supplier.riskLevel ?? "LOW",
-      notes: supplier.notes ?? "",
+      industrySectors: supplier.industrySectors?.join(", ") ?? "",
+      address: supplier.locations?.[0]?.address ?? "",
+      city: supplier.locations?.[0]?.city ?? "",
+      state: supplier.locations?.[0]?.state ?? "",
+      country: supplier.locations?.[0]?.country ?? "",
+      duns: supplier.duns ?? "",
+      naicsCodes: supplier.naicsCodes?.join(", ") ?? "",
+      riskNotes: supplier.riskNotes ?? "",
+      engineeringNotes: supplier.engineeringNotes ?? "",
     };
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -117,27 +93,40 @@ export function SupplierEditor({ supplier }: Props) {
     setError("");
 
     const body = {
-      ...form,
-      employeeCount: form.employeeCount ? parseInt(form.employeeCount, 10) : undefined,
-      tier: form.tier || undefined,
+      name: form.name,
+      identifier: form.identifier,
+      supplierType: form.supplierType,
+      status: form.status,
       description: form.description || undefined,
       website: form.website || undefined,
       taxId: form.taxId || undefined,
-      industry: form.industry || undefined,
-      annualRevenue: form.annualRevenue || undefined,
-      currency: form.currency || undefined,
-      paymentTerms: form.paymentTerms || undefined,
-      shippingTerms: form.shippingTerms || undefined,
-      addressLine1: form.addressLine1 || undefined,
-      addressLine2: form.addressLine2 || undefined,
-      city: form.city || undefined,
-      state: form.state || undefined,
-      postalCode: form.postalCode || undefined,
-      country: form.country || undefined,
-      dunsNumber: form.dunsNumber || undefined,
-      naicsCode: form.naicsCode || undefined,
-      riskLevel: form.riskLevel || undefined,
-      notes: form.notes || undefined,
+      industrySectors: form.industrySectors
+        ? form.industrySectors
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+      duns: form.duns || undefined,
+      naicsCodes: form.naicsCodes
+        ? form.naicsCodes
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined,
+      riskNotes: form.riskNotes || undefined,
+      engineeringNotes: form.engineeringNotes || undefined,
+      locations:
+        form.address || form.city || form.state || form.country
+          ? [
+              {
+                name: "Primary",
+                address: form.address || undefined,
+                city: form.city || undefined,
+                state: form.state || undefined,
+                country: form.country || undefined,
+              },
+            ]
+          : undefined,
     };
 
     try {
@@ -184,7 +173,7 @@ export function SupplierEditor({ supplier }: Props) {
               <X className="mr-1.5 size-4" />
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving || !form.name || !form.supplierCode}>
+            <Button type="submit" disabled={isSaving || !form.name || !form.identifier}>
               {isSaving ? (
                 <Loader2 className="mr-1.5 size-4 animate-spin" />
               ) : (
@@ -216,18 +205,18 @@ export function SupplierEditor({ supplier }: Props) {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Supplier Code *</label>
+                <label className="text-foreground text-xs font-medium">Identifier *</label>
                 <Input
-                  value={form.supplierCode}
-                  onChange={(e) => updateField("supplierCode", e.target.value)}
+                  value={form.identifier}
+                  onChange={(e) => updateField("identifier", e.target.value)}
                   required
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">Type</label>
                 <select
-                  value={form.type}
-                  onChange={(e) => updateField("type", e.target.value)}
+                  value={form.supplierType}
+                  onChange={(e) => updateField("supplierType", e.target.value)}
                   className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
                 >
                   {SUPPLIER_TYPES.map((t) => (
@@ -252,14 +241,11 @@ export function SupplierEditor({ supplier }: Props) {
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Tier</label>
-                <Input value={form.tier} onChange={(e) => updateField("tier", e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Industry</label>
+                <label className="text-foreground text-xs font-medium">Industry Sectors</label>
                 <Input
-                  value={form.industry}
-                  onChange={(e) => updateField("industry", e.target.value)}
+                  value={form.industrySectors}
+                  onChange={(e) => updateField("industrySectors", e.target.value)}
+                  placeholder="e.g. Aerospace, Defense"
                 />
               </div>
               <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -281,17 +267,10 @@ export function SupplierEditor({ supplier }: Props) {
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Address Line 1</label>
+                <label className="text-foreground text-xs font-medium">Address</label>
                 <Input
-                  value={form.addressLine1}
-                  onChange={(e) => updateField("addressLine1", e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Address Line 2</label>
-                <Input
-                  value={form.addressLine2}
-                  onChange={(e) => updateField("addressLine2", e.target.value)}
+                  value={form.address}
+                  onChange={(e) => updateField("address", e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -301,13 +280,6 @@ export function SupplierEditor({ supplier }: Props) {
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">State / Province</label>
                 <Input value={form.state} onChange={(e) => updateField("state", e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Postal Code</label>
-                <Input
-                  value={form.postalCode}
-                  onChange={(e) => updateField("postalCode", e.target.value)}
-                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">Country</label>
@@ -335,43 +307,19 @@ export function SupplierEditor({ supplier }: Props) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">DUNS Number</label>
-                <Input
-                  value={form.dunsNumber}
-                  onChange={(e) => updateField("dunsNumber", e.target.value)}
-                />
+                <Input value={form.duns} onChange={(e) => updateField("duns", e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">NAICS Code</label>
+                <label className="text-foreground text-xs font-medium">NAICS Codes</label>
                 <Input
-                  value={form.naicsCode}
-                  onChange={(e) => updateField("naicsCode", e.target.value)}
+                  value={form.naicsCodes}
+                  onChange={(e) => updateField("naicsCodes", e.target.value)}
+                  placeholder="Comma separated"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">Tax ID</label>
                 <Input value={form.taxId} onChange={(e) => updateField("taxId", e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Currency</label>
-                <Input
-                  value={form.currency}
-                  onChange={(e) => updateField("currency", e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Employees</label>
-                <Input
-                  type="number"
-                  value={form.employeeCount}
-                  onChange={(e) => updateField("employeeCount", e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Annual Revenue</label>
-                <Input
-                  value={form.annualRevenue}
-                  onChange={(e) => updateField("annualRevenue", e.target.value)}
-                />
               </div>
             </div>
           </Stack>
@@ -380,44 +328,25 @@ export function SupplierEditor({ supplier }: Props) {
         <Panel padding="lg">
           <Stack gap={6}>
             <h2 className="text-foreground text-sm font-semibold tracking-wide uppercase">
-              Commercial Terms
+              Internal Notes
             </h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Payment Terms</label>
-                <Input
-                  value={form.paymentTerms}
-                  onChange={(e) => updateField("paymentTerms", e.target.value)}
+                <label className="text-foreground text-xs font-medium">Risk Notes</label>
+                <Textarea
+                  value={form.riskNotes}
+                  onChange={(e) => updateField("riskNotes", e.target.value)}
+                  rows={3}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Shipping Terms</label>
-                <Input
-                  value={form.shippingTerms}
-                  onChange={(e) => updateField("shippingTerms", e.target.value)}
+                <label className="text-foreground text-xs font-medium">Engineering Notes</label>
+                <Textarea
+                  value={form.engineeringNotes}
+                  onChange={(e) => updateField("engineeringNotes", e.target.value)}
+                  rows={3}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-foreground text-xs font-medium">Risk Level</label>
-                <select
-                  value={form.riskLevel}
-                  onChange={(e) => updateField("riskLevel", e.target.value)}
-                  className="border-border bg-background text-foreground rounded-md border px-3 py-2 text-sm"
-                >
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-foreground text-xs font-medium">Notes</label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => updateField("notes", e.target.value)}
-                rows={3}
-              />
             </div>
           </Stack>
         </Panel>

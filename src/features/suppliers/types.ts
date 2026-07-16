@@ -1,69 +1,54 @@
+export interface SupplierLocation {
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  type?: string;
+}
+
 export interface SupplierDTO {
   id: string;
+  organizationId: string;
+  supplierType: string;
+  identifier: string;
   name: string;
-  supplierCode: string;
-  status: string;
-  type: string;
-  tier: string;
+  legalName?: string | null;
   description?: string | null;
   website?: string | null;
-  logoUrl?: string | null;
   taxId?: string | null;
-  industry?: string | null;
-  employeeCount?: number | null;
-  annualRevenue?: string | null;
-  currency?: string | null;
-  paymentTerms?: string | null;
-  shippingTerms?: string | null;
-  preferredCurrency?: string | null;
-  minOrderValue?: number | null;
-  leadTimeDays?: number | null;
-  qualityRating?: number | null;
-  deliveryRating?: number | null;
-  costRating?: number | null;
-  complianceRating?: number | null;
-  overallRating?: number | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  city?: string | null;
-  state?: string | null;
-  postalCode?: string | null;
-  country?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  timezone?: string | null;
-  language?: string | null;
-  onboardingDate?: string | null;
-  contractStartDate?: string | null;
-  contractEndDate?: string | null;
-  contractValue?: number | null;
-  dunsNumber?: string | null;
-  naicsCode?: string | null;
-  isoCertifications?: string | null;
-  riskLevel?: string | null;
-  riskScore?: number | null;
-  lastAssessmentDate?: string | null;
-  nextAssessmentDate?: string | null;
-  notes?: string | null;
-  tags: string[];
-  metadata: Record<string, unknown>;
-  organizationId: string;
+  duns?: string | null;
+  cageCode?: string | null;
+  naicsCodes?: string[] | null;
+  industrySectors?: string[] | null;
+  supportedPrograms?: string[] | null;
+  locations?: SupplierLocation[] | null;
+  riskNotes?: string | null;
+  engineeringNotes?: string | null;
+  status: string;
+  metadata?: Record<string, unknown> | null;
+  tags?: string[] | null;
+  labels?: Record<string, string> | null;
   createdById?: string | null;
   updatedById?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+
   certifications?: CertificationDTO[];
   capabilities?: CapabilityDTO[];
   facilities?: FacilityDTO[];
   contacts?: ContactDTO[];
-  relationships?: RelationshipDTO[];
+  outgoingRelationships?: RelationshipDTO[];
+  incomingRelationships?: RelationshipDTO[];
+
   _count?: {
     certifications: number;
     capabilities: number;
     facilities: number;
     contacts: number;
-    relationships: number;
+    outgoingRelationships?: number;
+    incomingRelationships?: number;
   };
 }
 
@@ -72,17 +57,18 @@ export interface CertificationDTO {
   supplierId: string;
   certificationType: string;
   certificationName: string;
-  issuingBody?: string | null;
+  issuingBody: string;
   certificateNumber?: string | null;
   issueDate?: string | null;
   expiryDate?: string | null;
   status: string;
   scope?: string | null;
-  standardReference?: string | null;
-  assessmentDate?: string | null;
-  nextAssessmentDate?: string | null;
+  evidenceUrl?: string | null;
+  evidenceDocumentId?: string | null;
   notes?: string | null;
-  attachments: string[];
+  verifiedAt?: string | null;
+  verifiedById?: string | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,46 +81,40 @@ export interface CapabilityDTO {
   description?: string | null;
   category?: string | null;
   subcategory?: string | null;
-  maturityLevel?: string | null;
-  status: string;
-  qualityScore?: number | null;
-  deliveryScore?: number | null;
-  costScore?: number | null;
-  innovationScore?: number | null;
-  complianceScore?: number | null;
-  overallScore?: number | null;
-  evidenceReference?: string | null;
-  verificationSource?: string | null;
-  verifiedAt?: string | null;
-  verifiedById?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
+  materials?: string[] | null;
+  processes?: string[] | null;
+  equipment?: string[] | null;
+  qualityStandards?: string[] | null;
+  maxDimensions?: string | null;
+  tolerances?: string | null;
+  capacity?: string | null;
+  leadTimeDays?: number | null;
   notes?: string | null;
-  tags: string[];
+  status: string;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface FacilityDTO {
   id: string;
+  organizationId: string;
   supplierId: string;
   name: string;
   type: string;
-  status?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
+  address?: string | null;
   city?: string | null;
   state?: string | null;
-  postalCode?: string | null;
   country?: string | null;
+  postalCode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  squareFootage?: number | null;
-  employeeCount?: number | null;
-  yearEstablished?: number | null;
-  certifications?: string | null;
-  operatingHours?: string | null;
-  notes?: string | null;
+  areaSqFt?: number | null;
+  employees?: number | null;
+  certifications?: string[] | null;
+  capabilities?: string[] | null;
+  status: string;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -142,13 +122,11 @@ export interface FacilityDTO {
 export interface ContactDTO {
   id: string;
   supplierId: string;
-  firstName: string;
-  lastName: string;
+  name: string;
+  title?: string | null;
   email?: string | null;
   phone?: string | null;
-  mobilePhone?: string | null;
-  jobTitle?: string | null;
-  department?: string | null;
+  mobile?: string | null;
   role?: string | null;
   isPrimary: boolean;
   notes?: string | null;
@@ -158,16 +136,19 @@ export interface ContactDTO {
 
 export interface RelationshipDTO {
   id: string;
-  supplierId: string;
-  relatedSupplierId?: string | null;
-  relatedOrganizationId?: string | null;
+  organizationId: string;
+  sourceSupplierId: string;
+  targetSupplierId: string;
   relationshipType: string;
-  direction: string;
   description?: string | null;
-  status: string;
+  contractReference?: string | null;
+  program?: string | null;
   startDate?: string | null;
   endDate?: string | null;
-  metadata: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+
+  sourceSupplier?: Partial<SupplierDTO>;
+  targetSupplier?: Partial<SupplierDTO>;
 }

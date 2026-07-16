@@ -60,17 +60,15 @@ export function ContactList({ contacts, onAdd, onDelete }: Props) {
               <TableRow key={contact.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span className="text-foreground text-sm font-medium">
-                      {contact.firstName} {contact.lastName}
-                    </span>
+                    <span className="text-foreground text-sm font-medium">{contact.name}</span>
                     {contact.isPrimary && <Star className="text-warning size-3" />}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="text-muted-foreground text-xs">{contact.jobTitle ?? "—"}</span>
+                  <span className="text-muted-foreground text-xs">{contact.title ?? "—"}</span>
                 </TableCell>
                 <TableCell>
-                  <span className="text-muted-foreground text-xs">{contact.department ?? "—"}</span>
+                  <span className="text-muted-foreground text-xs">{contact.role ?? "—"}</span>
                 </TableCell>
                 <TableCell>
                   {contact.email ? (
@@ -86,7 +84,7 @@ export function ContactList({ contacts, onAdd, onDelete }: Props) {
                   )}
                 </TableCell>
                 <TableCell>
-                  {contact.phone || contact.mobilePhone ? (
+                  {contact.phone || contact.mobile ? (
                     <div className="flex items-center gap-1 text-xs">
                       {contact.phone && (
                         <a
@@ -97,13 +95,13 @@ export function ContactList({ contacts, onAdd, onDelete }: Props) {
                           {contact.phone}
                         </a>
                       )}
-                      {contact.mobilePhone && (
+                      {contact.mobile && (
                         <a
-                          href={`tel:${contact.mobilePhone}`}
+                          href={`tel:${contact.mobile}`}
                           className="text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
                         >
                           <Smartphone className="size-3" />
-                          {contact.mobilePhone}
+                          {contact.mobile}
                         </a>
                       )}
                     </div>
