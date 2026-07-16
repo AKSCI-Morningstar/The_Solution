@@ -55,6 +55,7 @@ export const SIDEBAR_NAV: SidebarNavEntry[] = [
     items: [
       { label: "Documents", href: ROUTES.documents, icon: "FileText" },
       { label: "Suppliers", href: ROUTES.suppliers, icon: "Truck" },
+      { label: "Precedents", href: ROUTES.precedents, icon: "History" },
     ],
   },
   {

@@ -1,42 +1,123 @@
 export type PrecedentType = "FAILURE" | "SUCCESSFUL_DESIGN" | "REGULATORY_PRECEDENT" | "SUPPLIER_HISTORY";
 
-export interface EngineeringPrecedent {
+export interface Precedent {
   id: string;
+  organizationId: string;
   title: string;
-  type: PrecedentType;
-  description: string;
-  rootCause?: string;
-  correctiveAction?: string;
-  resolutionStatus: string; // e.g. "RESOLVED", "MITIGATED", "MONITORED"
-  confidenceScore: number;
-  applicableSystems: string[];
-  evidenceMetadata?: {
-    documents?: string[];
-    standards?: string[];
-    testReports?: string[];
-  };
+  summary: string | null;
+  engineeringQuestion: string | null;
+  decisionMade: string | null;
+  supportingEvidence: string[];
+  contradictions: string[];
+  missingEvidence: string[];
+  outcome: string | null;
+  lessonsLearned: string[];
+  relatedProjects: string[];
+  relatedSuppliers: string[];
+  relatedRequirements: string[];
+  relatedDocuments: string[];
+  relatedComponents: string[];
+  relatedStandards: string[];
+  relatedCertifications: string[];
+  decisionDate: string | null;
+  decisionOwner: string | null;
+  confidence: number;
+  tags: string[];
+  organization: string | null;
+  version: number;
+  sourceEntityId: string | null;
+  sourceAssessmentId: string | null;
+  createdById: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
+}
 
-  // Rich explainability and integration fields
-  whyRelevant?: string;
-  evidenceStrength?: number;
-  linkedEntities?: { id: string; name: string; type: string; identifier: string }[];
-  relatedRequirements?: string[];
+export interface PrecedentVersion {
+  id: string;
+  precedentId: string;
+  version: number;
+  snapshot: string;
+  changeDescription: string | null;
+  createdById: string | null;
+  createdAt: string;
+}
+
+export interface MatchedPrecedent extends Precedent {
+  similarityScore: number;
+  matchReasons: string[];
+}
+
+export interface PrecedentCreateInput {
+  title: string;
+  summary?: string;
+  engineeringQuestion?: string;
+  decisionMade?: string;
+  supportingEvidence?: string[];
+  contradictions?: string[];
+  missingEvidence?: string[];
+  outcome?: string;
+  lessonsLearned?: string[];
+  relatedProjects?: string[];
   relatedSuppliers?: string[];
-  relatedFailures?: string[];
-  relatedCorrectiveActions?: string[];
-  engineeringStandards?: string[];
-  graphRelationshipsTraversed?: string[];
-  rulesEvaluated?: string[];
-  assumptionsRejected?: string[];
-  versionHistory?: { id: string; version: string; description: string; createdAt: string }[];
-  auditTrail?: { id: string; action: string; metadata: unknown; createdAt: string }[];
+  relatedRequirements?: string[];
+  relatedDocuments?: string[];
+  relatedComponents?: string[];
+  relatedStandards?: string[];
+  relatedCertifications?: string[];
+  decisionDate?: string;
+  decisionOwner?: string;
+  confidence?: number;
+  tags?: string[];
+  organization?: string;
+  sourceEntityId?: string;
+  sourceAssessmentId?: string;
 }
 
-export interface PrecedentQuery {
-  type?: PrecedentType;
+export interface PrecedentUpdateInput extends Partial<PrecedentCreateInput> {
+  id: string;
+}
+
+export interface PrecedentFilter {
   search?: string;
-  system?: string;
+  supplier?: string;
+  requirement?: string;
+  component?: string;
+  project?: string;
+  certification?: string;
+  standard?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  decisionOwner?: string;
+  tags?: string[];
+  confidenceMin?: number;
+  confidenceMax?: number;
+  organizationId?: string;
+  includeDeleted?: boolean;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
 
+export interface PrecedentMatchContext {
+  suppliers?: string[];
+  components?: string[];
+  requirements?: string[];
+  standards?: string[];
+  certifications?: string[];
+  documents?: string[];
+  contradictions?: string[];
+  evidence?: string[];
+  tags?: string[];
+  project?: string;
+  question?: string;
+}
+
+export interface PrecedentSearchResult {
+  data: MatchedPrecedent[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}

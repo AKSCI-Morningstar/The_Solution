@@ -3,1249 +3,941 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  name            String?
-  passwordHash    String
-  isEmailVerified Boolean   @default(false)
-  status          String    @default("active")
-  lastLoginAt     DateTime?
-  metadata        Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-
-  sessions                Session[]
-  verificationTokens      VerificationToken[]
-  ownedOrganizations      Organization[]              @relation("OrganizationOwner")
-  memberships             OrganizationMember[]
-  sentInvitations         Invitation[]                @relation("InvitationSender")
-  authEvents              AuthEvent[]
-  createdEntities         EngineeringEntity[]         @relation("EntityCreatedBy")
-  updatedEntities         EngineeringEntity[]         @relation("EntityUpdatedBy")
-  createdRelationships    EngineeringRelationship[]
-  createdVersions         EntityVersion[]
-  createdAuditLogs        EntityAuditLog[]
-  uploadedDocuments       IngestionDocument[]         @relation("DocumentUploadedBy")
-  createdDocumentVersions IngestionDocumentVersion[]  @relation("DocumentVersionCreatedBy")
-  createdIngestionJobs    IngestionJob[]              @relation("IngestionJobCreatedBy")
-  ownedRules              Rule[]                      @relation("RuleOwner")
-  createdRules            Rule[]                      @relation("RuleCreatedBy")
-  updatedRules            Rule[]                      @relation("RuleUpdatedBy")
-  publishedRules          Rule[]                      @relation("RulePublishedBy")
-  createdRuleVersions     RuleVersion[]               @relation("RuleVersionCreatedBy")
-  createdRuleFragments    RuleFragment[]
-  triggeredRuleExecutions RuleExecutionResult[]       @relation("RuleExecutionTriggeredBy")
-  detectedContradictions  Contradiction[]             @relation("ContradictionDetectedBy")
-  resolvedContradictions  Contradiction[]             @relation("ContradictionResolvedBy")
-  contradictionLogActions ContradictionLifecycleLog[] @relation("ContradictionLogPerformedBy")
-  triggeredOrchestrations OrchestrationRun[]          @relation("OrchestrationTriggeredBy")
-  triggeredRealityAssessments RealityAssessment[]     @relation("RealityAssessmentTriggeredBy")
-  notifications            Notification[]
-  generatedReports         Report[]                  @relation("ReportGeneratedBy")
-  createdSuppliers         Supplier[]                @relation("SupplierCreatedBy")
-  updatedSuppliers         Supplier[]                @relation("SupplierUpdatedBy")
-
-  @@index([email])
-  @@index([status])
-  @@index([deletedAt])
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  name               String?
+  passwordHash       String?
+  status             String               @default("active")
+  lastLoginAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  authEvents         AuthEvent[]
+  members            OrganizationMember[]
+  sessions           Session[]
+  verificationTokens VerificationToken[]
 }
 
 model Organization {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  description String?
-  logo        String?
-  metadata    Json?
-  settings    Json?
-  status      String    @default("active")
-  ownerId     String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  owner                    User                      @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  members                  OrganizationMember[]
-  invitations              Invitation[]
-  engineeringEntities      EngineeringEntity[]
+  id                String               @id @default(cuid())
+  name              String
+  slug              String               @unique
+  description       String?
+  status            String               @default("active")
+  ownerId           String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  invitations       Invitation[]
+  members           OrganizationMember[]
+  precedents        Precedent[]
+  precedentVersions PrecedentVersion[]
+  roles             Role[]
+  auditLogs         AuditLog[]
+  reports           Report[]
+  rules             Rule[]
+  ruleFragments     RuleFragment[]
+  ruleDependencies  RuleDependency[]
+  ruleExecutionResults RuleExecutionResult[]
+  contradictions    Contradiction[]
+  orchestrationRuns OrchestrationRun[]
+  realityAssessments RealityAssessment[]
+  suppliers         Supplier[]
+  supplierFacilities SupplierFacility[]
+  supplierRelationships SupplierRelationship[]
+  notifications     Notification[]
+  ingestionDocuments IngestionDocument[]
+  ingestionJobs     IngestionJob[]
+  engineeringEntities EngineeringEntity[]
   engineeringRelationships EngineeringRelationship[]
-  graphNodeIndices         GraphNodeIndex[]
-  graphEdgeIndices         GraphEdgeIndex[]
-  graphLayouts             GraphLayout[]
-  graphSnapshots           GraphSnapshot[]
-  ingestionDocuments       IngestionDocument[]
-  ingestionJobs            IngestionJob[]
-  extractedEntities        ExtractedEntity[]
-  extractedRelationships   ExtractedRelationship[]
-  extractedReferences      ExtractedReference[]
-  rules                    Rule[]
-  ruleFragments            RuleFragment[]
-  ruleDependencies         RuleDependency[]
-  ruleExecutionResults     RuleExecutionResult[]
-  contradictions           Contradiction[]
-  orchestrationRuns        OrchestrationRun[]
-  realityAssessments       RealityAssessment[]
-  notifications            Notification[]
-  reports                  Report[]
-  suppliers                Supplier[]
-  supplierFacilities       SupplierFacility[]
-  supplierRelationships    SupplierRelationship[]
-
-  @@index([slug])
-  @@index([ownerId])
-  @@index([status])
-  @@index([deletedAt])
+  graphNodes        GraphNodeIndex[]
+  graphEdges        GraphEdgeIndex[]
+  graphLayouts      GraphLayout[]
+  timestamps        Timestamp[]
 }
 
 model OrganizationMember {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   userId         String
-  role           String    @default("member")
-  status         String    @default("active")
+  role           String       @default("engineer")
+  status         String       @default("active")
   invitedBy      String?
   joinedAt       DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, userId])
-  @@index([organizationId])
-  @@index([userId])
-  @@index([role])
-  @@index([status])
-}
-
-model Role {
-  id             String   @id @default(cuid())
-  organizationId String?
-  name           String
-  slug           String
-  description    String?
-  isSystem       Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  permissions RolePermission[]
-
-  @@unique([organizationId, slug])
-  @@index([organizationId])
-}
-
-model Permission {
-  id          String   @id @default(cuid())
-  resource    String
-  action      String
-  description String?
-  createdAt   DateTime @default(now())
-
-  roles RolePermission[]
-
-  @@unique([resource, action])
-  @@index([resource])
-}
-
-model RolePermission {
-  roleId       String
-  permissionId String
-  createdAt    DateTime @default(now())
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
 }
 
 model Invitation {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  email          String?
+  email          String
   userId         String?
-  token          String    @unique
-  role           String    @default("member")
-  status         String    @default("pending")
-  invitedBy      String
+  token          String       @unique
+  role           String
+  status         String       @default("pending")
+  invitedBy      String?
   expiresAt      DateTime
   acceptedAt     DateTime?
   declinedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  inviter      User         @relation("InvitationSender", fields: [invitedBy], references: [id])
+model Role {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String?
+  description    String?
+  isSystem       Boolean      @default(true)
+  permissions    String       @default("[]")
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@index([token])
-  @@index([organizationId])
-  @@index([email])
-  @@index([userId])
-  @@index([status])
+  @@unique([organizationId, name])
 }
 
 model Session {
   id        String   @id @default(cuid())
-  token     String   @unique
   userId    String
+  token     String   @unique
   userAgent String?
   ipAddress String?
-  expiresAt DateTime
   isRevoked Boolean  @default(false)
+  expiresAt DateTime
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model VerificationToken {
-  id        String    @id @default(cuid())
-  token     String    @unique
+  id        String   @id @default(cuid())
   userId    String
+  token     String   @unique
   type      String
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId, type])
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model AuthEvent {
   id        String   @id @default(cuid())
-  userId    String?
+  userId    String
   action    String
-  metadata  Json?
+  metadata  String   @default("{}")
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  action         String
+  entity         String
+  entityId       String
+  metadata       String       @default("{}")
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@index([userId])
-  @@index([action])
-  @@index([createdAt])
+  @@index([organizationId])
+  @@index([organizationId, entity, entityId])
 }
 
 model EngineeringEntity {
-  id             String    @id @default(cuid())
-  organizationId String
-  entityType     String
-  identifier     String
-  name           String
-  description    String?
-  version        String    @default("1.0.0")
-  status         String    @default("DRAFT")
-  tags           Json?
-  labels         Json?
-  metadata       Json?
-  createdById    String?
-  updatedById    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("EntityCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User?        @relation("EntityUpdatedBy", fields: [updatedById], references: [id])
-
-  sourceRelationships EngineeringRelationship[] @relation("SourceEntity")
+  id                  String                    @id @default(cuid())
+  organizationId      String
+  entityType          String
+  identifier          String
+  name                String
+  description         String?
+  status              String                    @default("ACTIVE")
+  version             String                    @default("1.0.0")
+  metadata            String                    @default("{}")
+  tags                String?
+  labels              String?
+  createdById         String?
+  updatedById         String?
+  deletedAt           DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  organization        Organization              @relation(fields: [organizationId], references: [id])
   targetRelationships EngineeringRelationship[] @relation("TargetEntity")
-  versions            EntityVersion[]
+  sourceRelationships EngineeringRelationship[] @relation("SourceEntity")
   auditLogs           EntityAuditLog[]
+  versions            EntityVersion[]
+  results             RuleExecutionResult[]
+  contradictionSource Contradiction[]           @relation("ContradictionSource")
+  contradictionTarget Contradiction[]           @relation("ContradictionTarget")
 
   @@unique([organizationId, identifier])
   @@index([organizationId])
   @@index([organizationId, entityType])
   @@index([organizationId, status])
-  @@index([deletedAt])
 }
 
 model EngineeringRelationship {
-  id               String   @id @default(cuid())
+  id               String            @id @default(cuid())
   organizationId   String
-  relationshipType String
   sourceEntityId   String
   targetEntityId   String
-  metadata         Json?
+  relationshipType String
+  metadata         String            @default("{}")
   createdById      String?
-  createdAt        DateTime @default(now())
-
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sourceEntity EngineeringEntity @relation("SourceEntity", fields: [sourceEntityId], references: [id], onDelete: Cascade)
-  targetEntity EngineeringEntity @relation("TargetEntity", fields: [targetEntityId], references: [id], onDelete: Cascade)
-  createdBy    User?             @relation(fields: [createdById], references: [id])
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  targetEntity     EngineeringEntity @relation("TargetEntity", fields: [targetEntityId], references: [id])
+  sourceEntity     EngineeringEntity @relation("SourceEntity", fields: [sourceEntityId], references: [id])
 
   @@unique([organizationId, sourceEntityId, targetEntityId, relationshipType])
   @@index([organizationId])
   @@index([organizationId, sourceEntityId])
   @@index([organizationId, targetEntityId])
-  @@index([organizationId, relationshipType])
 }
 
 model EntityVersion {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   entityId          String
   version           String
-  snapshot          Json
+  snapshot          String
   changeDescription String?
   createdById       String?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime          @default(now())
+  entity            EngineeringEntity @relation(fields: [entityId], references: [id])
 
-  entity    EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
-  createdBy User?             @relation(fields: [createdById], references: [id])
-
-  @@unique([entityId, version])
   @@index([entityId])
-  @@index([createdAt])
+  @@index([entityId, version])
 }
 
 model EntityAuditLog {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   entityId    String
   action      String
-  metadata    Json?
+  metadata    String            @default("{}")
   createdById String?
-  createdAt   DateTime @default(now())
-
-  entity    EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
-  createdBy User?             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime          @default(now())
+  entity      EngineeringEntity @relation(fields: [entityId], references: [id])
 
   @@index([entityId])
   @@index([entityId, action])
-  @@index([createdAt])
 }
-
-model GraphNodeIndex {
-  id             String   @id @default(cuid())
-  organizationId String
-  entityId       String   @unique
-  entityType     String
-  identifier     String
-  label          String
-  status         String
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  outgoing     GraphEdgeIndex[] @relation("EdgeSource")
-  incoming     GraphEdgeIndex[] @relation("EdgeTarget")
-
-  @@index([organizationId])
-  @@index([organizationId, entityType])
-  @@index([organizationId, status])
-  @@index([entityId])
-}
-
-model GraphEdgeIndex {
-  id               String   @id @default(cuid())
-  organizationId   String
-  relationshipId   String   @unique
-  sourceNodeId     String
-  targetNodeId     String
-  relationshipType String
-  metadata         Json?
-  createdAt        DateTime @default(now())
-
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sourceNode   GraphNodeIndex @relation("EdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  targetNode   GraphNodeIndex @relation("EdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-  @@index([organizationId, sourceNodeId])
-  @@index([organizationId, targetNodeId])
-  @@index([organizationId, relationshipType])
-  @@index([sourceNodeId, targetNodeId])
-}
-
-model GraphLayout {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  nodes        GraphLayoutNode[]
-
-  @@index([organizationId])
-}
-
-model GraphLayoutNode {
-  id          String   @id @default(cuid())
-  layoutId    String
-  nodeIndexId String
-  positionX   Float
-  positionY   Float
-  pinned      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  layout GraphLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
-
-  @@unique([layoutId, nodeIndexId])
-  @@index([layoutId])
-}
-
-model GraphSnapshot {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-}
-
-model AuditLog {
-  id             String   @id @default(cuid())
-  organizationId String?
-  action         String
-  entity         String
-  entityId       String
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([entity, entityId])
-  @@index([action])
-  @@index([createdAt])
-  @@index([organizationId])
-  @@index([organizationId, entity])
-  @@index([organizationId, createdAt])
-  @@index([organizationId, action])
-}
-
-model Timestamp {
-  id        String   @id @default(cuid())
-  label     String
-  value     DateTime
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([label])
-  @@index([value])
-}
-
-// ---------------------------------------------------------------------------
-// Engineering Ingestion Pipeline
-//
-// Converts uploaded engineering documents into structured, provenanced
-// "extraction" records. This layer does NOT determine engineering truth:
-// ExtractedEntity/ExtractedRelationship/ExtractedReference are a staging
-// area (status PENDING/CONFIRMED/REJECTED) distinct from the canonical
-// EngineeringEntity/EngineeringRelationship graph above. Promotion from
-// extraction to canonical truth is a future milestone (see linkedEntityId).
-// ---------------------------------------------------------------------------
-
-model IngestionDocument {
-  id             String    @id @default(cuid())
-  organizationId String
-  fileName       String
-  mimeType       String
-  fileExtension  String
-  sizeBytes      Int
-  checksum       String
-  storageKey     String
-  status         String    @default("UPLOADED")
-  currentVersion Int       @default(1)
-  uploadedById   String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  uploadedBy   User?        @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
-
-  versions               IngestionDocumentVersion[]
-  jobs                   IngestionJob[]
-  extractedEntities      ExtractedEntity[]
-  extractedRelationships ExtractedRelationship[]
-  extractedReferences    ExtractedReference[]
-
-  @@index([organizationId])
-  @@index([organizationId, status])
-  @@index([uploadedById])
-  @@index([checksum])
-  @@index([deletedAt])
-}
-
-model IngestionDocumentVersion {
-  id          String   @id @default(cuid())
-  documentId  String
-  version     Int
-  fileName    String
-  mimeType    String
-  sizeBytes   Int
-  checksum    String
-  storageKey  String
-  createdById String?
-  createdAt   DateTime @default(now())
-
-  document  IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdBy User?             @relation("DocumentVersionCreatedBy", fields: [createdById], references: [id])
-
-  jobs              IngestionJob[]
-  extractedEntities ExtractedEntity[]
-
-  @@unique([documentId, version])
-  @@index([documentId])
-  @@index([createdById])
-}
-
-model IngestionJob {
-  id                String    @id @default(cuid())
-  organizationId    String
-  documentId        String
-  documentVersionId String
-  status            String    @default("QUEUED")
-  currentStage      String?
-  stageIndex        Int       @default(0)
-  totalStages       Int       @default(13)
-  progressPercent   Int       @default(0)
-  attempt           Int       @default(1)
-  maxAttempts       Int       @default(3)
-  priority          Int       @default(0)
-  scheduledAt       DateTime  @default(now())
-  startedAt         DateTime?
-  completedAt       DateTime?
-  cancelRequested   Boolean   @default(false)
-  parserName        String?
-  parserVersion     String?
-  documentType      String?
-  graphPreview      Json?
-  errorStage        String?
-  errorMessage      String?
-  createdById       String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  document        IngestionDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  documentVersion IngestionDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
-  createdBy       User?                    @relation("IngestionJobCreatedBy", fields: [createdById], references: [id])
-
-  stageLogs              IngestionStageLog[]
-  extractedEntities      ExtractedEntity[]
-  extractedRelationships ExtractedRelationship[]
-  extractedReferences    ExtractedReference[]
-  validationIssues       IngestionValidationIssue[]
-
-  @@index([organizationId])
-  @@index([organizationId, status])
-  @@index([documentId])
-  @@index([documentVersionId])
-  @@index([createdById])
-  @@index([scheduledAt])
-  @@index([status, scheduledAt])
-}
-
-model IngestionStageLog {
-  id           String    @id @default(cuid())
-  jobId        String
-  stageName    String
-  stageIndex   Int
-  status       String
-  startedAt    DateTime  @default(now())
-  completedAt  DateTime?
-  durationMs   Int?
-  errorMessage String?
-  metadata     Json?
-
-  job IngestionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@index([jobId])
-  @@index([jobId, stageIndex])
-}
-
-model ExtractedEntity {
-  id                String   @id @default(cuid())
-  organizationId    String
-  jobId             String
-  documentId        String
-  documentVersionId String
-  entityType        String
-  identifier        String?
-  name              String
-  rawText           String
-  attributes        Json?
-  confidence        Float
-  status            String   @default("PENDING")
-  page              Int?
-  section           String?
-  paragraph         Int?
-  extractionMethod  String
-  parserVersion     String
-  extractedAt       DateTime @default(now())
-  linkedEntityId    String?
-
-  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  job             IngestionJob             @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  document        IngestionDocument        @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  documentVersion IngestionDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
-
-  sourceRelationships ExtractedRelationship[] @relation("ExtractedRelSource")
-  targetRelationships ExtractedRelationship[] @relation("ExtractedRelTarget")
-
-  @@index([organizationId])
-  @@index([jobId])
-  @@index([documentId])
-  @@index([organizationId, entityType])
-  @@index([organizationId, status])
-}
-
-model ExtractedRelationship {
-  id                      String   @id @default(cuid())
-  organizationId          String
-  jobId                   String
-  documentId              String
-  relationshipType        String
-  sourceExtractedEntityId String
-  targetExtractedEntityId String
-  confidence              Float
-  page                    Int?
-  section                 String?
-  extractionMethod        String
-  parserVersion           String
-  extractedAt             DateTime @default(now())
-
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  job          IngestionJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  document     IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  sourceEntity ExtractedEntity   @relation("ExtractedRelSource", fields: [sourceExtractedEntityId], references: [id], onDelete: Cascade)
-  targetEntity ExtractedEntity   @relation("ExtractedRelTarget", fields: [targetExtractedEntityId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-  @@index([jobId])
-  @@index([documentId])
-  @@index([sourceExtractedEntityId])
-  @@index([targetExtractedEntityId])
-}
-
-model ExtractedReference {
-  id               String   @id @default(cuid())
-  organizationId   String
-  jobId            String
-  documentId       String
-  referenceType    String
-  rawText          String
-  targetIdentifier String
-  resolved         Boolean  @default(false)
-  resolvedEntityId String?
-  page             Int?
-  section          String?
-  confidence       Float
-  extractionMethod String
-  parserVersion    String
-  extractedAt      DateTime @default(now())
-
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  job          IngestionJob      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  document     IngestionDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-  @@index([jobId])
-  @@index([documentId])
-  @@index([organizationId, referenceType])
-}
-
-model IngestionValidationIssue {
-  id        String   @id @default(cuid())
-  jobId     String
-  severity  String
-  code      String
-  message   String
-  stage     String
-  context   Json?
-  createdAt DateTime @default(now())
-
-  job IngestionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@index([jobId])
-  @@index([jobId, severity])
-}
-
-// ---------------------------------------------------------------------------
-// Deterministic Engineering Rule Engine
-//
-// Rules evaluate the canonical EngineeringEntity/EngineeringRelationship graph
-// (source of truth) only - never ExtractedEntity/Relationship/Reference
-// directly, since those are unconfirmed ingestion-pipeline staging output.
-// Extraction records are consulted only as supplementary, soft-linked
-// (by organizationId + entityType + identifier, no FK) supporting evidence
-// and conflict detection - never as the subject of a rule itself.
-// ---------------------------------------------------------------------------
 
 model Rule {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   name           String
   description    String?
-  category       String
-  priority       Int       @default(0)
-  severity       String    @default("WARNING")
-  status         String    @default("DRAFT")
-  version        Int       @default(1)
-  tags           Json?
-  labels         Json?
+  category       String?
+  priority       Int?
+  severity       String?
+  scope          String       @default("{}")
+  condition      String       @default("{}")
+  conditionRoot  String?
+  action         String       @default("{}")
+  status         String       @default("ACTIVE")
+  version        String       @default("1.0.0")
+  tags           String?
+  labels         String?
   ownerId        String?
-  scope          Json
-  conditionRoot  Json
   createdById    String?
   updatedById    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
   publishedAt    DateTime?
   publishedById  String?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  owner        User?        @relation("RuleOwner", fields: [ownerId], references: [id])
-  createdBy    User?        @relation("RuleCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User?        @relation("RuleUpdatedBy", fields: [updatedById], references: [id])
-  publishedBy  User?        @relation("RulePublishedBy", fields: [publishedById], references: [id])
-
-  versions         RuleVersion[]
-  dependsOn        RuleDependency[]      @relation("DependentRule")
-  dependents       RuleDependency[]      @relation("DependencyRule")
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  versions       RuleVersion[]
+  dependencies   RuleDependency[] @relation("RuleDependencies")
+  dependedOnBy   RuleDependency[] @relation("RuleDependedOn")
   executionResults RuleExecutionResult[]
 
-  @@unique([organizationId, name])
   @@index([organizationId])
   @@index([organizationId, status])
-  @@index([organizationId, category])
-  @@index([ownerId])
-  @@index([deletedAt])
+  @@index([organizationId, name])
 }
 
 model RuleVersion {
   id                String   @id @default(cuid())
   ruleId            String
-  version           Int
-  snapshot          Json
+  version           String
+  snapshot          String
   changeDescription String?
   createdById       String?
   createdAt         DateTime @default(now())
+  rule              Rule     @relation(fields: [ruleId], references: [id])
 
-  rule      Rule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  createdBy User? @relation("RuleVersionCreatedBy", fields: [createdById], references: [id])
-
-  @@unique([ruleId, version])
   @@index([ruleId])
-  @@index([createdById])
+  @@index([ruleId, version])
 }
 
 model RuleFragment {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   name           String
   description    String?
-  condition      Json
-  version        Int      @default(1)
+  condition      String       @default("{}")
   createdById    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation(fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, name])
   @@index([organizationId])
 }
 
 model RuleDependency {
-  id              String   @id @default(cuid())
+  id              String       @id @default(cuid())
+  organizationId  String
   ruleId          String
   dependsOnRuleId String
-  organizationId  String
-  createdAt       DateTime @default(now())
+  createdAt       DateTime     @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  rule            Rule         @relation("RuleDependencies", fields: [ruleId], references: [id])
+  dependsOn       Rule         @relation("RuleDependedOn", fields: [dependsOnRuleId], references: [id])
 
-  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  rule          Rule         @relation("DependentRule", fields: [ruleId], references: [id], onDelete: Cascade)
-  dependsOnRule Rule         @relation("DependencyRule", fields: [dependsOnRuleId], references: [id], onDelete: Cascade)
-
-  @@unique([ruleId, dependsOnRuleId])
+  @@unique([organizationId, ruleId, dependsOnRuleId])
   @@index([organizationId])
-  @@index([ruleId])
-  @@index([dependsOnRuleId])
+  @@index([organizationId, ruleId])
+  @@index([organizationId, dependsOnRuleId])
 }
 
 model RuleExecutionResult {
-  id                     String   @id @default(cuid())
+  id                     String            @id @default(cuid())
   organizationId         String
   ruleId                 String
-  ruleVersion            Int
+  ruleVersion            String?
   subjectEntityId        String
   batchId                String?
   outcome                String
-  trace                  Json
-  supportingEntityIds    Json?
-  supportingDocumentRefs Json?
-  missingEvidence        Json?
-  conflictingEvidence    Json?
-  executionTimeMs        Int
-  evaluatedAt            DateTime @default(now())
+  trace                  String?
+  supportingEntityIds    String            @default("[]")
+  supportingDocumentRefs String            @default("[]")
+  missingEvidence        String            @default("[]")
+  conflictingEvidence    String            @default("[]")
+  executionTimeMs        Int?
   triggeredById          String?
-  createdAt              DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  rule         Rule         @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  triggeredBy  User?        @relation("RuleExecutionTriggeredBy", fields: [triggeredById], references: [id])
+  createdAt              DateTime          @default(now())
+  organization           Organization      @relation(fields: [organizationId], references: [id])
+  rule                   Rule              @relation(fields: [ruleId], references: [id])
+  subjectEntity          EngineeringEntity @relation(fields: [subjectEntityId], references: [id])
 
   @@index([organizationId])
-  @@index([ruleId])
-  @@index([organizationId, ruleId, subjectEntityId])
-  @@index([subjectEntityId])
-  @@index([batchId])
-  @@index([outcome])
+  @@index([organizationId, ruleId])
+  @@index([organizationId, subjectEntityId])
+  @@index([organizationId, batchId])
 }
 
 model Contradiction {
-  id                  String    @id @default(cuid())
-  organizationId      String
-  type                String
-  severity            String    @default("NEEDS_REVIEW")
-  status              String    @default("DETECTED")
-  label               String
-  description         String
-  sourceEntityIds     Json      @default("[]")
-  sourceDocumentIds   Json      @default("[]")
-  supportingEvidence  Json      @default("[]")
-  conflictingEvidence Json      @default("[]")
-  traceabilityChain   Json      @default("[]")
-  affectedEntities    Json      @default("[]")
-  detectedById        String?
-  resolvedById        String?
-  resolutionNotes     String?
-  detectedAt          DateTime  @default(now())
-  resolvedAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  organization  Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  detectedBy    User?                       @relation("ContradictionDetectedBy", fields: [detectedById], references: [id])
-  resolvedBy    User?                       @relation("ContradictionResolvedBy", fields: [resolvedById], references: [id])
-  lifecycleLogs ContradictionLifecycleLog[]
+  id               String                     @id @default(cuid())
+  organizationId   String
+  type             String
+  severity         String                     @default("MEDIUM")
+  sourceEntityId   String
+  targetEntityId   String
+  description      String
+  status           String                     @default("OPEN")
+  resolutionNotes  String?
+  detectedById     String?
+  resolvedById     String?
+  detectedAt       DateTime                   @default(now())
+  resolvedAt       DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  organization     Organization               @relation(fields: [organizationId], references: [id])
+  sourceEntity     EngineeringEntity          @relation("ContradictionSource", fields: [sourceEntityId], references: [id])
+  targetEntity     EngineeringEntity          @relation("ContradictionTarget", fields: [targetEntityId], references: [id])
+  lifecycleLogs    ContradictionLifecycleLog[]
 
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([organizationId, type])
-  @@index([organizationId, severity])
-  @@index([detectedAt])
+  @@index([organizationId, sourceEntityId])
+  @@index([organizationId, targetEntityId])
 }
 
 model ContradictionLifecycleLog {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   contradictionId String
   action          String
   fromStatus      String?
-  toStatus        String
-  metadata        Json?
-  performedById   String?
-  createdAt       DateTime @default(now())
-
-  contradiction Contradiction @relation(fields: [contradictionId], references: [id], onDelete: Cascade)
-  performedBy   User?         @relation("ContradictionLogPerformedBy", fields: [performedById], references: [id])
+  toStatus        String?
+  changedById     String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  contradiction   Contradiction @relation(fields: [contradictionId], references: [id])
 
   @@index([contradictionId])
-  @@index([createdAt])
 }
 
-// ---------------------------------------------------------------------------
-// Engineering Reasoning Orchestrator
-//
-// Coordinates the existing Knowledge Graph, Ingestion, Evidence Resolution,
-// Contradiction, and Rule engines into one deterministic, repeatable
-// evaluation per run. The Orchestrator never performs its own reasoning - it
-// only sequences calls into those engines and aggregates their outputs.
-// ---------------------------------------------------------------------------
-
 model OrchestrationRun {
-  id                  String    @id @default(cuid())
-  organizationId      String
-  status              String    @default("QUEUED")
-  subjectEntityId     String
-  inputs              Json
-  currentStage        String?
-  stageIndex          Int       @default(0)
-  totalStages         Int       @default(10)
-  cancelRequested     Boolean   @default(false)
-  assessment          Json?
-  subjectEntityIds    Json      @default("[]")
-  evidenceSummary     Json?
-  ruleResultIds       Json      @default("[]")
-  contradictionIds    Json      @default("[]")
-  traceabilitySummary Json?
-  startedAt           DateTime?
-  completedAt         DateTime?
-  durationMs          Int?
-  errorStage          String?
-  errorMessage        String?
-  triggeredById       String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  triggeredBy        User?                   @relation("OrchestrationTriggeredBy", fields: [triggeredById], references: [id])
-  stageLogs          OrchestrationStageLog[]
-  realityAssessments RealityAssessment[]
+  id              String              @id @default(cuid())
+  organizationId  String
+  subjectEntityId String
+  status          String              @default("QUEUED")
+  outcome         String?
+  triggeredById   String?
+  inputs          String?
+  currentStage    String?
+  stageIndex      Int?
+  cancelRequested Boolean             @default(false)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  stageLogs       OrchestrationStageLog[]
+  assessments     RealityAssessment[] @relation("RunAssessments")
 
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([organizationId, subjectEntityId])
-  @@index([triggeredById])
-  @@index([createdAt])
 }
 
 model OrchestrationStageLog {
-  id           String    @id @default(cuid())
+  id           String           @id @default(cuid())
   runId        String
   stageName    String
   stageIndex   Int
   status       String
-  attempt      Int       @default(1)
-  startedAt    DateTime  @default(now())
+  attempt      Int              @default(1)
+  startedAt    DateTime?
   completedAt  DateTime?
   durationMs   Int?
   errorMessage String?
-  output       Json?
-  metadata     Json?
-
-  run OrchestrationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  output       String?
+  createdAt    DateTime         @default(now())
+  run          OrchestrationRun @relation(fields: [runId], references: [id])
 
   @@index([runId])
-  @@index([runId, stageIndex])
+  @@index([runId, stageName])
 }
-
-model Notification {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String
-  type           String
-  title          String
-  message        String
-  link           String?
-  isRead         Boolean  @default(false)
-  metadata       Json?
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, userId])
-  @@index([userId, isRead])
-  @@index([createdAt])
-}
-
-// ---------------------------------------------------------------------------
-// Engineering Reality Engine
-//
-// Determines Engineering Reality - the current verifiable state of an
-// engineering system - by reinterpreting an already-completed Orchestration
-// Run's outputs (never re-executing the Rule or Contradiction engines) plus
-// two additional, genuinely new deterministic signals: whether any
-// associated contradiction's lifecycle status has changed since the run
-// completed, and whether the Ingestion Pipeline has finished processing the
-// source documents for every entity in scope. The Reality Engine never
-// invents a conclusion - if reality cannot be established, the outcome is
-// exactly "INSUFFICIENT_EVIDENCE".
-// ---------------------------------------------------------------------------
 
 model RealityAssessment {
-  id                    String    @id @default(cuid())
-  organizationId        String
-  subjectEntityId       String
-  orchestrationRunId    String
-  status                String    @default("QUEUED")
-  currentStage          String?
-  stageIndex            Int       @default(0)
-  totalStages           Int       @default(8)
-  cancelRequested       Boolean   @default(false)
-  outcome               String?
-  reasoning             String?
-  entitiesEvaluated     Json      @default("[]")
-  evidenceSummary       Json?
-  ruleSummary           Json?
-  contradictionSummary  Json?
-  traceabilitySummary   Json?
-  ingestionCompleteness Json?
-  startedAt             DateTime?
-  completedAt           DateTime?
-  durationMs            Int?
-  errorStage            String?
-  errorMessage          String?
-  triggeredById         String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  orchestrationRun OrchestrationRun  @relation(fields: [orchestrationRunId], references: [id], onDelete: Cascade)
-  triggeredBy     User?              @relation("RealityAssessmentTriggeredBy", fields: [triggeredById], references: [id])
-  stageLogs       RealityStageLog[]
+  id                String             @id @default(cuid())
+  organizationId    String
+  subjectEntityId   String
+  orchestrationRunId String?
+  status            String             @default("PENDING")
+  outcome           String?
+  triggeredById     String?
+  currentStage      String?
+  stageIndex        Int?
+  cancelRequested   Boolean            @default(false)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  orchestrationRun  OrchestrationRun?  @relation("RunAssessments", fields: [orchestrationRunId], references: [id])
+  stageLogs         RealityStageLog[]
 
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([organizationId, subjectEntityId])
-  @@index([orchestrationRunId])
-  @@index([triggeredById])
-  @@index([createdAt])
 }
 
 model RealityStageLog {
-  id           String    @id @default(cuid())
+  id           String           @id @default(cuid())
   assessmentId String
   stageName    String
   stageIndex   Int
   status       String
-  attempt      Int       @default(1)
-  startedAt    DateTime  @default(now())
+  attempt      Int              @default(1)
+  startedAt    DateTime?
   completedAt  DateTime?
   durationMs   Int?
   errorMessage String?
-  output       Json?
-  metadata     Json?
-
-  assessment RealityAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  output       String?
+  createdAt    DateTime         @default(now())
+  assessment   RealityAssessment @relation(fields: [assessmentId], references: [id])
 
   @@index([assessmentId])
-  @@index([assessmentId, stageIndex])
+  @@index([assessmentId, stageName])
 }
-
-// ---------------------------------------------------------------------------
-// Enterprise Reporting & Engineering Analytics Platform
-//
-// Every report is generated synchronously from a fixed `type` plus
-// deterministic `filters`, computed entirely from data already persisted by
-// the other subsystems (no generative or probabilistic logic). The computed
-// `data` payload is persisted immutably alongside the report row, so every
-// report is itself a permanent, re-viewable, exportable record - "saved
-// reports" are simply this table; "favorites" is the one mutable field.
-// ---------------------------------------------------------------------------
-
-model Report {
-  id             String    @id @default(cuid())
-  organizationId String
-  type           String
-  title          String
-  filters        Json      @default("{}")
-  data           Json
-  isFavorite     Boolean   @default(false)
-  generatedById  String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  generatedBy  User?        @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
-
-  @@index([organizationId])
-  @@index([organizationId, type])
-  @@index([organizationId, isFavorite])
-  @@index([generatedById])
-  @@index([createdAt])
-}
-
-// ---------------------------------------------------------------------------
-// Enterprise Supplier Intelligence Platform
-//
-// Manages suppliers, manufacturers, distributors, subcontractors, partners,
-// facilities, certifications, capabilities, and dependencies. Every supplier
-// relationship, capability, and certification is deterministic and
-// evidence-backed - stored alongside optional links to supporting documents
-// and the canonical EngineeringEntity/EngineeringRelationship graph.
-// ---------------------------------------------------------------------------
 
 model Supplier {
-  id                 String    @id @default(cuid())
-  organizationId     String
-  supplierType       String    @default("SUPPLIER")
-  identifier         String
-  name               String
-  legalName          String?
-  description        String?
-  website            String?
-  taxId              String?
-  duns               String?
-  cageCode           String?
-  naicsCodes         Json?
-  industrySectors    Json?
-  supportedPrograms  Json?
-  locations          Json?
-  riskNotes          String?
-  engineeringNotes   String?
-  status             String    @default("ACTIVE")
-  metadata           Json?
-  tags               Json?
-  labels             Json?
-  createdById        String?
-  updatedById        String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("SupplierCreatedBy", fields: [createdById], references: [id])
-  updatedBy    User?        @relation("SupplierUpdatedBy", fields: [updatedById], references: [id])
-
-  contacts        SupplierContact[]
-  certifications  SupplierCertification[]
-  capabilities    SupplierCapability[]
-  facilities      SupplierFacility[]
-  outgoingRelationships SupplierRelationship[] @relation("SupplierRelSource")
-  incomingRelationships SupplierRelationship[] @relation("SupplierRelTarget")
+  id                String       @id @default(cuid())
+  organizationId    String
+  supplierType      String?
+  identifier        String
+  name              String
+  legalName         String?
+  description       String?
+  website           String?
+  taxId             String?
+  duns              String?
+  cageCode          String?
+  naicsCodes        String?
+  industrySectors   String?
+  supportedPrograms String?
+  locations         String?
+  riskNotes         String?
+  engineeringNotes  String?
+  status            String       @default("ACTIVE")
+  tags              String?
+  labels            String?
+  metadata          String       @default("{}")
+  createdById       String?
+  updatedById       String?
+  deletedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  contacts          SupplierContact[]
+  facilities        SupplierFacility[]
+  certifications    SupplierCertification[]
+  capabilities      SupplierCapability[]
+  sourceRelationships SupplierRelationship[] @relation("SourceSupplier")
+  targetRelationships SupplierRelationship[] @relation("TargetSupplier")
 
   @@unique([organizationId, identifier])
   @@index([organizationId])
-  @@index([organizationId, supplierType])
   @@index([organizationId, status])
-  @@index([deletedAt])
+  @@index([organizationId, name])
 }
 
 model SupplierContact {
-  id             String   @id @default(cuid())
-  supplierId     String
-  name           String
-  title          String?
-  email          String?
-  phone          String?
-  mobile         String?
-  role           String?
-  isPrimary      Boolean  @default(false)
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  supplierId  String
+  name        String
+  title       String?
+  email       String?
+  phone       String?
+  mobile      String?
+  role        String?
+  isPrimary   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
 
   @@index([supplierId])
-  @@index([supplierId, isPrimary])
+}
+
+model SupplierFacility {
+  id              String       @id @default(cuid())
+  organizationId  String
+  supplierId      String
+  name            String
+  type            String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  postalCode      String?
+  latitude        Float?
+  longitude       Float?
+  areaSqFt        Float?
+  employees       Int?
+  certifications  String?
+  capabilities    String?
+  status          String       @default("ACTIVE")
+  metadata        String       @default("{}")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  supplier        Supplier     @relation(fields: [supplierId], references: [id])
+
+  @@index([organizationId])
+  @@index([supplierId])
+  @@index([organizationId, supplierId])
 }
 
 model SupplierCertification {
-  id               String    @id @default(cuid())
-  supplierId       String
-  certificationType String
-  certificationName String
-  issuingBody      String
-  certificateNumber String?
-  issueDate        DateTime?
-  expiryDate       DateTime?
-  status           String    @default("ACTIVE")
-  scope            String?
-  evidenceUrl      String?
-  evidenceDocumentId String?
-  notes            String?
-  verifiedAt       DateTime?
-  verifiedById     String?
-  metadata         Json?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  supplierId          String
+  certificationType   String?
+  certificationName   String
+  issuingBody         String?
+  certificateNumber   String?
+  issueDate           DateTime?
+  expiryDate          DateTime?
+  status              String   @default("ACTIVE")
+  scope               String?
+  evidenceUrl         String?
+  evidenceDocumentId  String?
+  notes               String?
+  metadata            String   @default("{}")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  supplier            Supplier @relation(fields: [supplierId], references: [id])
 
   @@index([supplierId])
-  @@index([supplierId, certificationType])
-  @@index([supplierId, status])
-  @@index([expiryDate])
 }
 
 model SupplierCapability {
   id               String   @id @default(cuid())
   supplierId       String
-  capabilityType   String
+  capabilityType   String?
   capabilityName   String
   description      String?
   category         String?
   subcategory      String?
-  materials        Json?
-  processes        Json?
-  equipment        Json?
-  qualityStandards Json?
+  materials        String?
+  processes        String?
+  equipment        String?
+  qualityStandards String?
   maxDimensions    String?
   tolerances       String?
   capacity         String?
   leadTimeDays     Int?
   notes            String?
   status           String   @default("ACTIVE")
-  metadata         Json?
+  metadata         String   @default("{}")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier         Supplier @relation(fields: [supplierId], references: [id])
 
   @@index([supplierId])
-  @@index([supplierId, capabilityType])
-  @@index([supplierId, status])
-}
-
-model SupplierFacility {
-  id             String   @id @default(cuid())
-  organizationId String
-  supplierId     String
-  name           String
-  type           String   @default("PLANT")
-  address        String?
-  city           String?
-  state          String?
-  country        String?
-  postalCode     String?
-  latitude       Float?
-  longitude      Float?
-  areaSqFt       Float?
-  employees      Int?
-  certifications Json?
-  capabilities   Json?
-  status         String   @default("ACTIVE")
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-  @@index([supplierId])
-  @@index([organizationId, type])
-  @@index([organizationId, country])
 }
 
 model SupplierRelationship {
-  id                 String   @id @default(cuid())
-  organizationId     String
-  sourceSupplierId   String
-  targetSupplierId   String
-  relationshipType   String
-  description        String?
-  contractReference  String?
-  program            String?
-  startDate          DateTime?
-  endDate            DateTime?
-  metadata           Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sourceSupplier Supplier    @relation("SupplierRelSource", fields: [sourceSupplierId], references: [id], onDelete: Cascade)
-  targetSupplier Supplier    @relation("SupplierRelTarget", fields: [targetSupplierId], references: [id], onDelete: Cascade)
+  id                  String       @id @default(cuid())
+  organizationId      String
+  sourceSupplierId    String
+  targetSupplierId    String
+  relationshipType    String
+  description         String?
+  contractReference   String?
+  program             String?
+  startDate           DateTime?
+  endDate             DateTime?
+  metadata            String       @default("{}")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  sourceSupplier      Supplier     @relation("SourceSupplier", fields: [sourceSupplierId], references: [id])
+  targetSupplier      Supplier     @relation("TargetSupplier", fields: [targetSupplierId], references: [id])
 
   @@unique([organizationId, sourceSupplierId, targetSupplierId, relationshipType])
   @@index([organizationId])
-  @@index([organizationId, sourceSupplierId])
-  @@index([organizationId, targetSupplierId])
-  @@index([organizationId, relationshipType])
+  @@index([sourceSupplierId])
+  @@index([targetSupplierId])
+}
+
+model IngestionDocument {
+  id              String                    @id @default(cuid())
+  organizationId  String
+  fileName        String
+  mimeType        String?
+  fileExtension   String?
+  sizeBytes       Int?
+  checksum        String?
+  storageKey      String?
+  currentVersion  Int                       @default(1)
+  status          String                    @default("PENDING")
+  uploadedById    String?
+  deletedAt       DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  organization    Organization              @relation(fields: [organizationId], references: [id])
+  versions        IngestionDocumentVersion[]
+  jobs            IngestionJob[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, fileName])
+}
+
+model IngestionDocumentVersion {
+  id              String             @id @default(cuid())
+  documentId      String
+  version         Int
+  fileName        String?
+  mimeType        String?
+  sizeBytes       Int?
+  checksum        String?
+  storageKey      String?
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  document        IngestionDocument  @relation(fields: [documentId], references: [id])
+  jobs            IngestionJob[]
+
+  @@unique([documentId, version])
+  @@index([documentId])
+}
+
+model IngestionJob {
+  id                 String               @id @default(cuid())
+  organizationId     String
+  documentId         String
+  documentVersionId  String?
+  totalStages        Int?
+  priority           Int                  @default(0)
+  status             String               @default("QUEUED")
+  currentStage       String?
+  stageIndex         Int?
+  progressPercent    Float?
+  errorStage         String?
+  errorMessage       String?
+  cancelRequested    Boolean              @default(false)
+  attempt            Int                  @default(1)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  scheduledAt        DateTime?
+  createdById        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  organization       Organization         @relation(fields: [organizationId], references: [id])
+  document           IngestionDocument    @relation(fields: [documentId], references: [id])
+  documentVersion    IngestionDocumentVersion? @relation(fields: [documentVersionId], references: [id])
+  stageLogs          IngestionStageLog[]
+  validationIssues   IngestionValidationIssue[]
+  extractedEntities  ExtractedEntity[]
+  extractedRelationships ExtractedRelationship[]
+  extractedReferences ExtractedReference[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([documentId])
+}
+
+model IngestionStageLog {
+  id           String       @id @default(cuid())
+  jobId        String
+  stageName    String
+  stageIndex   Int
+  status       String
+  startedAt    DateTime?
+  completedAt  DateTime?
+  durationMs   Int?
+  errorMessage String?
+  createdAt    DateTime     @default(now())
+  job          IngestionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@index([jobId, stageName])
+}
+
+model IngestionValidationIssue {
+  id       String       @id @default(cuid())
+  jobId    String
+  severity String
+  code     String?
+  message  String
+  stage    String?
+  context  String?
+  job      IngestionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+
+model ExtractedEntity {
+  id              String       @id @default(cuid())
+  jobId           String
+  organizationId  String?
+  linkedEntityId  String?
+  name            String
+  entityType      String?
+  identifier      String?
+  description     String?
+  confidence      Float?
+  metadata        String       @default("{}")
+  createdAt       DateTime     @default(now())
+  job             IngestionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@index([organizationId])
+  @@index([linkedEntityId])
+}
+
+model ExtractedRelationship {
+  id               String       @id @default(cuid())
+  jobId            String
+  sourceEntityId   String?
+  targetEntityId   String?
+  relationshipType String?
+  confidence       Float?
+  metadata         String       @default("{}")
+  createdAt        DateTime     @default(now())
+  job              IngestionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+
+model ExtractedReference {
+  id        String       @id @default(cuid())
+  jobId     String
+  entityId  String?
+  reference String
+  type      String?
+  context   String?
+  confidence Float?
+  metadata  String       @default("{}")
+  createdAt DateTime     @default(now())
+  job       IngestionJob @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+}
+
+model GraphNodeIndex {
+  id             String       @id @default(cuid())
+  organizationId String
+  entityId       String
+  entityType     String
+  identifier     String
+  name           String
+  label          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, entityId])
+  @@index([organizationId])
+  @@index([organizationId, entityType])
+}
+
+model GraphEdgeIndex {
+  id               String       @id @default(cuid())
+  organizationId   String
+  sourceEntityId   String
+  targetEntityId   String
+  relationshipType String
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, sourceEntityId, targetEntityId, relationshipType])
+  @@index([organizationId])
+  @@index([organizationId, sourceEntityId])
+  @@index([organizationId, targetEntityId])
+}
+
+model GraphLayout {
+  id             String           @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  nodes          GraphLayoutNode[]
+
+  @@index([organizationId])
+}
+
+model GraphLayoutNode {
+  id          String     @id @default(cuid())
+  layoutId    String
+  nodeIndexId String
+  positionX   Float
+  positionY   Float
+  createdAt   DateTime   @default(now())
+  layout      GraphLayout @relation(fields: [layoutId], references: [id])
+
+  @@unique([layoutId, nodeIndexId])
+  @@index([layoutId])
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String
+  title          String
+  message        String?
+  link           String?
+  metadata       String       @default("{}")
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, userId])
+  @@index([organizationId, userId, isRead])
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           String
+  title          String
+  filters        String       @default("{}")
+  data           String       @default("{}")
+  isFavorite     Boolean      @default(false)
+  generatedById  String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, type])
+}
+
+model Precedent {
+  id                    String             @id @default(cuid())
+  organizationId        String
+  title                 String
+  summary               String?
+  engineeringQuestion   String?
+  decisionMade          String?
+  supportingEvidence    String?            @default("[]")
+  contradictions        String?            @default("[]")
+  missingEvidence       String?            @default("[]")
+  outcome               String?
+  lessonsLearned        String?            @default("[]")
+  relatedProjects       String?            @default("[]")
+  relatedSuppliers      String?            @default("[]")
+  relatedRequirements   String?            @default("[]")
+  relatedDocuments      String?            @default("[]")
+  relatedComponents     String?            @default("[]")
+  relatedStandards      String?            @default("[]")
+  relatedCertifications String?            @default("[]")
+  decisionDate          DateTime?
+  decisionOwner         String?
+  confidence            Float?             @default(1.0)
+  tags                  String?            @default("[]")
+  organization          String?
+  version               Int                @default(1)
+  sourceEntityId        String?
+  sourceAssessmentId    String?
+  createdById           String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
+  organizationRel       Organization       @relation(fields: [organizationId], references: [id])
+  versions              PrecedentVersion[]
+
+  @@index([organizationId])
+  @@index([organizationId, title])
+  @@index([organizationId, decisionDate])
+  @@index([organizationId, decisionOwner])
+  @@index([organizationId, confidence])
+  @@index([organizationId, deletedAt])
+}
+
+model PrecedentVersion {
+  id                String       @id @default(cuid())
+  precedentId       String
+  version           Int
+  snapshot          String
+  changeDescription String?
+  createdById       String?
+  createdAt         DateTime     @default(now())
+  organizationId    String
+  organizationRel   Organization @relation(fields: [organizationId], references: [id])
+  precedent         Precedent    @relation(fields: [precedentId], references: [id])
+
+  @@index([precedentId])
+  @@index([precedentId, version])
+}
+
+model Timestamp {
+  id        String       @id @default(cuid())
+  label     String
+  value     DateTime
+  metadata  String       @default("{}")
+  createdAt DateTime     @default(now())
+  organizationId String?
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
 }

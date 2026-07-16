@@ -19,217 +19,221 @@ import {
   FileText,
   Clock,
   GitBranch,
-  ShieldAlert
+  ShieldAlert,
+  ChevronRight,
+  Calendar,
+  User,
+  Tag,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronRight as ChevronRightIcon,
 } from "lucide-react";
 import { PageContainer, Section, Panel, GridLayout, Stack } from "@/components/layout";
 import { MetricCard, LoadingSpinner, EmptyState, Button } from "@/components/ui";
 import { cn } from "@/shared/utils";
-import { EngineeringPrecedent, PrecedentType } from "@/features/precedents/types";
 
-export default function PrecedentEnginePage() {
-  const [precedents, setPrecedents] = useState<EngineeringPrecedent[]>([]);
+interface Precedent {
+  id: string;
+  title: string;
+  summary: string | null;
+  engineeringQuestion: string | null;
+  decisionMade: string | null;
+  supportingEvidence: string[];
+  contradictions: string[];
+  missingEvidence: string[];
+  outcome: string | null;
+  lessonsLearned: string[];
+  relatedProjects: string[];
+  relatedSuppliers: string[];
+  relatedRequirements: string[];
+  relatedDocuments: string[];
+  relatedComponents: string[];
+  relatedStandards: string[];
+  relatedCertifications: string[];
+  decisionDate: string | null;
+  decisionOwner: string | null;
+  confidence: number;
+  tags: string[];
+  organization: string | null;
+  version: number;
+  sourceEntityId: string | null;
+  sourceAssessmentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PrecedentSearchResult {
+  data: Precedent[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+interface PrecedentVersion {
+  id: string;
+  version: number;
+  snapshot: string;
+  changeDescription: string | null;
+  createdById: string | null;
+  createdAt: string;
+}
+
+export default function PrecedentPage() {
+  const [searchResult, setSearchResult] = useState<PrecedentSearchResult | null>(null);
   const [systems, setSystems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Search and Filter State
+
+  // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState<string>("ALL");
-  const [selectedSystem, setSelectedSystem] = useState<string>("ALL");
+  const [supplierFilter, setSupplierFilter] = useState("");
+  const [standardFilter, setStandardFilter] = useState("");
+  const [componentFilter, setComponentFilter] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
 
-  // Selected precedent for the interactive detail panel
-  const [selectedPrecedent, setSelectedPrecedent] = useState<EngineeringPrecedent | null>(null);
+  // Detail panel state
+  const [selectedPrecedent, setSelectedPrecedent] = useState<Precedent | null>(null);
+  const [precedentVersions, setPrecedentVersions] = useState<PrecedentVersion[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
-  // Interactive Verification Reasoner State
-  const [verifySystem, setVerifySystem] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<{
-    matchedPrecedents: EngineeringPrecedent[];
-    recommendations: string[];
-    missingEvidence: string[];
-    overallRisk: "LOW" | "MEDIUM" | "HIGH";
-  } | null>(null);
-
-  // Add Precedent Form Modal State
+  // Form modal
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
-    type: "FAILURE" as PrecedentType,
-    description: "",
-    rootCause: "",
-    correctiveAction: "",
-    resolutionStatus: "RESOLVED",
-    confidenceScore: 0.95,
-    applicableSystemsStr: "",
-    documentsStr: "",
-    standardsStr: ""
+    summary: "",
+    engineeringQuestion: "",
+    decisionMade: "",
+    outcome: "",
+    lessonsLearned: "",
+    relatedSuppliers: "",
+    relatedComponents: "",
+    relatedStandards: "",
+    relatedCertifications: "",
+    relatedProjects: "",
+    relatedRequirements: "",
+    relatedDocuments: "",
+    supportingEvidence: "",
+    contradictions: "",
+    missingEvidence: "",
+    decisionDate: "",
+    decisionOwner: "",
+    confidence: 0.95,
+    tags: "",
   });
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
 
-  // Fetch Precedent data
+  const buildQueryString = useCallback(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set("search", searchQuery);
+    if (supplierFilter) params.set("supplier", supplierFilter);
+    if (standardFilter) params.set("standard", standardFilter);
+    if (componentFilter) params.set("component", componentFilter);
+    if (ownerFilter) params.set("decisionOwner", ownerFilter);
+    params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
+    return params.toString();
+  }, [searchQuery, supplierFilter, standardFilter, componentFilter, ownerFilter, page]);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const typeParam = selectedType !== "ALL" ? `&type=${selectedType}` : "";
-      const systemParam = selectedSystem !== "ALL" ? `&system=${selectedSystem}` : "";
-      const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : "";
-
-      const [resPrecedents, resSystems] = await Promise.all([
-        fetch(`/api/precedents?${searchParam}${typeParam}${systemParam}`),
-        fetch("/api/precedents/systems")
-      ]);
-
-      if (resPrecedents.ok) {
-        const json = await resPrecedents.json();
-        const data: EngineeringPrecedent[] = json.data ?? [];
-        setPrecedents(data);
-        
-        // Auto-select first precedent if none is selected
-        if (data.length > 0 && !selectedPrecedent) {
-          setSelectedPrecedent(data[0]);
-        } else if (selectedPrecedent) {
-          // Keep selection synchronized with updated data
-          const updated = data.find(p => p.id === selectedPrecedent.id);
-          if (updated) setSelectedPrecedent(updated);
-        }
-      }
-      if (resSystems.ok) {
-        const json = await resSystems.json();
-        setSystems(json.data ?? []);
+      const qs = buildQueryString();
+      const res = await fetch(`/api/precedents?${qs}`);
+      if (res.ok) {
+        const result: PrecedentSearchResult = await res.json();
+        setSearchResult(result);
       }
     } catch (err) {
-      console.error("Failed to load precedents data", err);
+      console.error("Failed to load precedents", err);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedType, selectedSystem, searchQuery, selectedPrecedent]);
+  }, [buildQueryString]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
-  // Run interactive design verification
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!verifySystem.trim()) return;
+  // Load versions when a precedent is selected
+  useEffect(() => {
+    if (selectedPrecedent) {
+      setIsLoadingVersions(true);
+      fetch(`/api/precedents/${selectedPrecedent.id}/versions`)
+        .then((res) => res.ok ? res.json() : { data: [] })
+        .then((json) => setPrecedentVersions(json.data ?? []))
+        .catch(() => setPrecedentVersions([]))
+        .finally(() => setIsLoadingVersions(false));
+    } else {
+      setPrecedentVersions([]);
+    }
+  }, [selectedPrecedent]);
 
-    setIsVerifying(true);
-    setVerificationResult(null);
-
-    setTimeout(() => {
-      const query = verifySystem.toLowerCase();
-      // Match precedents that relate to the system query
-      const matched = precedents.filter((p) =>
-        p.applicableSystems.some((sys) => sys.toLowerCase().includes(query)) ||
-        p.title.toLowerCase().includes(query) ||
-        p.description.toLowerCase().includes(query)
-      );
-
-      let overallRisk: "LOW" | "MEDIUM" | "HIGH" = "LOW";
-      const recommendations: string[] = [];
-      const missingEvidence: string[] = [];
-
-      if (matched.length > 0) {
-        const hasFailure = matched.some((p) => p.type === "FAILURE");
-        overallRisk = hasFailure ? "HIGH" : "MEDIUM";
-
-        matched.forEach((p) => {
-          if (p.correctiveAction && p.correctiveAction !== "N/A - System baseline verified.") {
-            recommendations.push(`From "${p.title}": ${p.correctiveAction}`);
-          }
-          if (p.evidenceMetadata?.standards && p.evidenceMetadata.standards.length > 0) {
-            missingEvidence.push(`Verification documents matching standard: ${p.evidenceMetadata.standards.join(", ")}`);
-          } else {
-            missingEvidence.push(`Independent validation report for design parameter referencing "${p.title}"`);
-          }
-        });
-      } else {
-        recommendations.push("No direct historical failure matches found. Proceed with standard baseline verification.");
-        missingEvidence.push("Standard peer review audit logs", "Component specification datasheet validation");
-      }
-
-      setVerificationResult({
-        matchedPrecedents: matched,
-        recommendations,
-        missingEvidence,
-        overallRisk
-      });
-      setIsVerifying(false);
-    }, 750);
-  };
-
-  // Form submit handler
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     setFormSuccess(false);
 
-    if (!formData.title.trim() || !formData.description.trim()) {
-      setFormError("Title and Description are required.");
+    if (!formData.title.trim()) {
+      setFormError("Title is required.");
       return;
     }
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: formData.title,
-        type: formData.type,
-        description: formData.description,
-        rootCause: formData.rootCause || undefined,
-        correctiveAction: formData.correctiveAction || undefined,
-        resolutionStatus: formData.resolutionStatus,
-        confidenceScore: parseFloat(formData.confidenceScore.toString()) || 0.95,
-        applicableSystems: formData.applicableSystemsStr
-          ? formData.applicableSystemsStr.split(",").map((s) => s.trim()).filter(Boolean)
-          : ["General"],
-        evidenceMetadata: {
-          documents: formData.documentsStr
-            ? formData.documentsStr.split(",").map((s) => s.trim()).filter(Boolean)
-            : [],
-          standards: formData.standardsStr
-            ? formData.standardsStr.split(",").map((s) => s.trim()).filter(Boolean)
-            : [],
-          testReports: []
-        }
+        summary: formData.summary || undefined,
+        engineeringQuestion: formData.engineeringQuestion || undefined,
+        decisionMade: formData.decisionMade || undefined,
+        outcome: formData.outcome || undefined,
+        confidence: formData.confidence || 0.95,
+        lessonsLearned: formData.lessonsLearned ? formData.lessonsLearned.split("\n").map((s) => s.trim()).filter(Boolean) : [],
+        relatedSuppliers: formData.relatedSuppliers ? formData.relatedSuppliers.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedComponents: formData.relatedComponents ? formData.relatedComponents.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedStandards: formData.relatedStandards ? formData.relatedStandards.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedCertifications: formData.relatedCertifications ? formData.relatedCertifications.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedProjects: formData.relatedProjects ? formData.relatedProjects.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedRequirements: formData.relatedRequirements ? formData.relatedRequirements.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        relatedDocuments: formData.relatedDocuments ? formData.relatedDocuments.split(",").map((s) => s.trim()).filter(Boolean) : [],
+        supportingEvidence: formData.supportingEvidence ? formData.supportingEvidence.split("\n").map((s) => s.trim()).filter(Boolean) : [],
+        contradictions: formData.contradictions ? formData.contradictions.split("\n").map((s) => s.trim()).filter(Boolean) : [],
+        missingEvidence: formData.missingEvidence ? formData.missingEvidence.split("\n").map((s) => s.trim()).filter(Boolean) : [],
+        decisionDate: formData.decisionDate || undefined,
+        decisionOwner: formData.decisionOwner || undefined,
+        tags: formData.tags ? formData.tags.split(",").map((s) => s.trim()).filter(Boolean) : [],
       };
 
       const res = await fetch("/api/precedents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         setFormSuccess(true);
         setFormData({
-          title: "",
-          type: "FAILURE",
-          description: "",
-          rootCause: "",
-          correctiveAction: "",
-          resolutionStatus: "RESOLVED",
-          confidenceScore: 0.95,
-          applicableSystemsStr: "",
-          documentsStr: "",
-          standardsStr: ""
+          title: "", summary: "", engineeringQuestion: "", decisionMade: "", outcome: "",
+          lessonsLearned: "", relatedSuppliers: "", relatedComponents: "", relatedStandards: "",
+          relatedCertifications: "", relatedProjects: "", relatedRequirements: "", relatedDocuments: "",
+          supportingEvidence: "", contradictions: "", missingEvidence: "",
+          decisionDate: "", decisionOwner: "", confidence: 0.95, tags: "",
         });
-        
-        // Reload list
         await loadData();
-        
-        // Close modal after a brief moment
-        setTimeout(() => {
-          setIsFormOpen(false);
-          setFormSuccess(false);
-        }, 1200);
+        setTimeout(() => { setIsFormOpen(false); setFormSuccess(false); }, 1200);
       } else {
         const errJson = await res.json();
-        setFormError(errJson.error || "Failed to submit precedent to the Truth Pipeline.");
+        setFormError(errJson.error || "Failed to create precedent.");
       }
     } catch {
-      setFormError("A network error occurred while submitting.");
+      setFormError("A network error occurred.");
     }
   };
+
+  const precedents = searchResult?.data ?? [];
+  const totalPages = searchResult?.totalPages ?? 0;
+  const total = searchResult?.total ?? 0;
 
   return (
     <PageContainer>
@@ -241,11 +245,10 @@ export default function PrecedentEnginePage() {
               <span className="bg-amber-500/10 text-amber-500 flex size-8 items-center justify-center rounded-md border border-amber-500/20">
                 <History className="size-4" />
               </span>
-              <h1 className="text-foreground text-3xl font-extrabold tracking-tight">The Precedent Engine</h1>
+              <h1 className="text-foreground text-3xl font-extrabold tracking-tight">Historical Precedents</h1>
             </div>
             <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-              Synthesizes previous design baselines, historical engineering failures, corrective actions, and regulatory wisdom. 
-              Ensures institutional engineering memory compounds and stays completely auditable.
+              Organizational memory of engineering decisions, outcomes, and lessons learned. Every decision made today becomes a precedent for tomorrow.
             </p>
           </div>
           <Button
@@ -258,634 +261,636 @@ export default function PrecedentEnginePage() {
         </div>
 
         {/* KPI Panel */}
-        <GridLayout columns={4} gap={4}>
-          <MetricCard
-            label="Historical Failure Records"
-            value={precedents.filter(p => p.type === "FAILURE").length}
-            icon={<AlertOctagon className="text-red-500 size-5" />}
-          />
-          <MetricCard
-            label="Validated Design Baselines"
-            value={precedents.filter(p => p.type === "SUCCESSFUL_DESIGN").length}
-            icon={<CheckCircle2 className="text-green-500 size-5" />}
-          />
-          <MetricCard
-            label="Regulatory & Standard Precedents"
-            value={precedents.filter(p => p.type === "REGULATORY_PRECEDENT").length}
-            icon={<FileCheck2 className="text-blue-500 size-5" />}
-          />
-          <MetricCard
-            label="Avg Assessment Confidence"
-            value={`${(precedents.reduce((acc, curr) => acc + curr.confidenceScore, 0) / (precedents.length || 1) * 100).toFixed(1)}%`}
-            icon={<ShieldCheck className="text-amber-500 size-5" />}
-          />
-        </GridLayout>
+        {searchResult && (
+          <GridLayout columns={4} gap={4}>
+            <MetricCard
+              label="Total Precedents"
+              value={total}
+              icon={<History className="text-amber-500 size-5" />}
+            />
+            <MetricCard
+              label="Current Page"
+              value={`${page} of ${totalPages || 1}`}
+              icon={<Layers className="text-blue-500 size-5" />}
+            />
+            <MetricCard
+              label="Avg Confidence"
+              value={`${precedents.length > 0 ? (precedents.reduce((a, p) => a + p.confidence, 0) / precedents.length * 100).toFixed(0) : 0}%`}
+              icon={<ShieldCheck className="text-green-500 size-5" />}
+            />
+            <MetricCard
+              label="Unique Owners"
+              value={new Set(precedents.map((p) => p.decisionOwner).filter(Boolean)).size}
+              icon={<User className="text-purple-500 size-5" />}
+            />
+          </GridLayout>
+        )}
 
-        {/* Dynamic Verification Hub (Interactive Reasoner) */}
-        <div className="border-border bg-zinc-50/50 dark:bg-zinc-900/10 rounded-xl border p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Sparkles className="text-amber-500 size-4" />
-            <h3 className="text-foreground text-base font-bold tracking-tight">Design & System Precedent Reasoner</h3>
-            <span className="text-muted-foreground text-xs font-medium bg-muted rounded px-1.5 py-0.5 ml-auto">Deterministic Engine</span>
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              placeholder="Search titles, summaries, decisions..."
+              className="bg-background border-border text-foreground w-full rounded-lg border py-2 pr-4 pl-10 text-sm outline-none focus:ring-1 focus:ring-ring"
+            />
           </div>
-          <p className="text-muted-foreground mb-6 max-w-xl text-xs leading-relaxed">
-            Verify a planned design element against historical precedents instantly. Enter a system, part name, or subsystem (e.g. &quot;fuel tank&quot;, &quot;alloy&quot;, &quot;guidance&quot;) to extract failures and compliance requirements.
-          </p>
-
-          <form onSubmit={handleVerify} className="flex gap-2">
-            <div className="relative flex-1">
-              <Layers className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <input
-                type="text"
-                value={verifySystem}
-                onChange={(e) => setVerifySystem(e.target.value)}
-                placeholder="Enter planned subsystem (e.g., 'cryogenic', 'titanium', 'actuator')..."
-                className="bg-background border-border text-foreground w-full rounded-lg border py-2.5 pr-4 pl-10 text-sm placeholder:text-muted-foreground/60 outline-none focus:ring-1 focus:ring-ring focus:border-ring"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={isVerifying || !verifySystem.trim()}
-              className="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold px-5 animate-pulse"
-            >
-              {isVerifying ? "Verifying..." : "Run Assessment"}
-            </Button>
-          </form>
-
-          {/* Verification Results Animation */}
-          <AnimatePresence mode="wait">
-            {verificationResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mt-6 border-t pt-5"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Risk Profile */}
-                  <div className="border border-dashed rounded-lg p-4 bg-background">
-                    <span className="text-xs text-muted-foreground block mb-2 font-mono">SYSTEM RISK PROFILE</span>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "size-2.5 rounded-full animate-ping",
-                        verificationResult.overallRisk === "HIGH" ? "bg-red-500" :
-                        verificationResult.overallRisk === "MEDIUM" ? "bg-amber-500" : "bg-green-500"
-                      )} />
-                      <span className="text-lg font-bold tracking-tight text-foreground">
-                        {verificationResult.overallRisk} RISK DETECTION
-                      </span>
-                    </div>
-                    <div className="mt-4 text-xs text-muted-foreground leading-relaxed">
-                      {verificationResult.matchedPrecedents.length} matched historical precedents detected in system memory.
-                    </div>
-                  </div>
-
-                  {/* Recommendations */}
-                  <div className="border border-dashed rounded-lg p-4 bg-background md:col-span-2">
-                    <span className="text-xs text-muted-foreground block mb-2 font-mono">DETERMINISTIC RECOMMENDATIONS</span>
-                    <ul className="space-y-2">
-                      {verificationResult.recommendations.map((rec, i) => (
-                        <li key={i} className="text-xs text-foreground flex gap-2 items-start">
-                          <CheckCircle2 className="text-green-500 size-4 shrink-0 mt-0.5" />
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="mt-4 border-t pt-3">
-                      <span className="text-[10px] text-muted-foreground block mb-2 font-mono">MISSING EVIDENCE & SUBMISSION REQS</span>
-                      <ul className="space-y-1">
-                        {verificationResult.missingEvidence.map((ev, i) => (
-                          <li key={i} className="text-[11px] text-amber-600 dark:text-amber-400 flex gap-1.5 items-center">
-                            <AlertTriangle className="size-3 shrink-0 animate-bounce" />
-                            <span>{ev}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <input
+            type="text"
+            value={supplierFilter}
+            onChange={(e) => { setSupplierFilter(e.target.value); setPage(1); }}
+            placeholder="Filter by supplier..."
+            className="bg-background border-border text-foreground rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring w-40"
+          />
+          <input
+            type="text"
+            value={standardFilter}
+            onChange={(e) => { setStandardFilter(e.target.value); setPage(1); }}
+            placeholder="Filter by standard..."
+            className="bg-background border-border text-foreground rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring w-40"
+          />
+          <input
+            type="text"
+            value={ownerFilter}
+            onChange={(e) => { setOwnerFilter(e.target.value); setPage(1); }}
+            placeholder="Filter by owner..."
+            className="bg-background border-border text-foreground rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring w-36"
+          />
         </div>
 
-        {/* Ledger & Controls Section */}
-        <Section title="Institutional Precedent Ledger">
-          {/* Controls Bar */}
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search historical rationale, root causes, corrective actions..."
-                className="bg-background border-border text-foreground w-full rounded-lg border py-2 pr-4 pl-10 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
+        {/* Main content */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Table */}
+          <Panel padding="none" className="overflow-hidden flex-1 w-full">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <LoadingSpinner />
+              </div>
+            ) : precedents.length === 0 ? (
+              <EmptyState
+                icon={<History className="size-10 text-muted-foreground" />}
+                title="No precedents found"
+                description="Adjust your filters or record a new precedent."
               />
-            </div>
-            
-            <div className="flex gap-2">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="bg-background border-border text-foreground rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring focus:border-ring"
-              >
-                <option value="ALL">All Precedent Types</option>
-                <option value="FAILURE">Failure Cases</option>
-                <option value="SUCCESSFUL_DESIGN">Successful Designs</option>
-                <option value="REGULATORY_PRECEDENT">Regulations</option>
-                <option value="SUPPLIER_HISTORY">Supplier History</option>
-              </select>
-
-              <select
-                value={selectedSystem}
-                onChange={(e) => setSelectedSystem(e.target.value)}
-                className="bg-background border-border text-foreground rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="ALL">All Systems</option>
-                {systems.map((sys) => (
-                  <option key={sys} value={sys}>{sys}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
-            {/* Left Column: Ledger Table */}
-            <Panel padding="none" className="overflow-hidden flex-1 w-full">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-24">
-                  <LoadingSpinner />
-                </div>
-              ) : precedents.length === 0 ? (
-                <EmptyState
-                  icon={<History className="size-10 text-muted-foreground" />}
-                  title="No matched precedents"
-                  description="Refine your search parameters or submit a new custom precedent record."
-                />
-              ) : (
+            ) : (
+              <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b bg-zinc-50 dark:bg-zinc-900/50 text-xs font-mono text-muted-foreground uppercase tracking-wider">
-                        <th className="px-6 py-4 font-medium">Record Title</th>
-                        <th className="px-6 py-4 font-medium">Type</th>
-                        <th className="px-6 py-4 font-medium">Target Systems</th>
+                        <th className="px-6 py-4 font-medium">Title</th>
+                        <th className="px-6 py-4 font-medium">Owner</th>
                         <th className="px-6 py-4 font-medium">Confidence</th>
-                        <th className="px-6 py-4 font-medium">Verification Status</th>
-                        <th className="px-6 py-4 font-medium">Created At</th>
+                        <th className="px-6 py-4 font-medium">Version</th>
+                        <th className="px-6 py-4 font-medium">Date</th>
+                        <th className="px-6 py-4 font-medium">Evidence</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y text-sm">
                       {precedents.map((prec) => (
                         <tr
                           key={prec.id}
-                          onClick={() => setSelectedPrecedent(prec)}
+                          onClick={() => setSelectedPrecedent(
+                            selectedPrecedent?.id === prec.id ? null : prec,
+                          )}
                           className={cn(
                             "cursor-pointer transition-all hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 group",
-                            selectedPrecedent?.id === prec.id ? "bg-amber-500/5 dark:bg-amber-500/5 border-l-2 border-l-amber-500" : ""
+                            selectedPrecedent?.id === prec.id
+                              ? "bg-amber-500/5 dark:bg-amber-500/5 border-l-2 border-l-amber-500"
+                              : "",
                           )}
                         >
                           <td className="px-6 py-4 max-w-md">
                             <div className="flex flex-col gap-1">
                               <span className={cn(
                                 "font-semibold text-foreground text-sm transition-colors",
-                                selectedPrecedent?.id === prec.id ? "text-amber-500" : "group-hover:text-amber-500"
+                                selectedPrecedent?.id === prec.id
+                                  ? "text-amber-500"
+                                  : "group-hover:text-amber-500",
                               )}>
                                 {prec.title}
                               </span>
-                              <span className="text-xs text-muted-foreground line-clamp-2">
-                                {prec.description}
-                              </span>
-                              
-                              {prec.rootCause && (
-                                <div className="mt-2 bg-red-500/5 border border-red-500/10 rounded px-2.5 py-1.5 text-xs text-red-700 dark:text-red-400">
-                                  <span className="font-bold uppercase tracking-wider font-mono text-[9px] block mb-0.5">Root Cause</span>
-                                  {prec.rootCause}
-                                </div>
-                              )}
-
-                              {prec.correctiveAction && prec.correctiveAction !== "N/A - System baseline verified." && (
-                                <div className="mt-1 bg-green-500/5 border border-green-500/10 rounded px-2.5 py-1.5 text-xs text-green-700 dark:text-green-400">
-                                  <span className="font-bold uppercase tracking-wider font-mono text-[9px] block mb-0.5">Verifiable Corrective Action</span>
-                                  {prec.correctiveAction}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={cn(
-                              "px-2 py-0.5 rounded text-[11px] font-mono font-semibold tracking-wide",
-                              prec.type === "FAILURE" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400" :
-                              prec.type === "SUCCESSFUL_DESIGN" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" :
-                              prec.type === "REGULATORY_PRECEDENT" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400" :
-                              "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-400"
-                            )}>
-                              {prec.type.replace("_", " ")}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap gap-1">
-                              {prec.applicableSystems.map((s) => (
-                                <span key={s} className="bg-muted text-foreground text-[10px] font-medium px-1.5 py-0.5 rounded">
-                                  {s}
+                              {prec.summary && (
+                                <span className="text-xs text-muted-foreground line-clamp-2">
+                                  {prec.summary}
                                 </span>
-                              ))}
+                              )}
+                              {prec.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {prec.tags.slice(0, 3).map((tag) => (
+                                    <span key={tag} className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground px-1 py-0.5 rounded">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">
+                            {prec.decisionOwner || "\u2014"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap font-mono text-xs">
-                            {(prec.confidenceScore * 100).toFixed(0)}%
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
                             <span className={cn(
-                              "inline-flex items-center gap-1.5 text-xs font-medium",
-                              prec.resolutionStatus === "RESOLVED" ? "text-green-600 dark:text-green-400" :
-                              prec.resolutionStatus === "MITIGATED" ? "text-amber-600 dark:text-amber-400" :
-                              "text-zinc-600 dark:text-zinc-400"
+                              "font-semibold",
+                              prec.confidence >= 0.8 ? "text-green-600 dark:text-green-400" :
+                              prec.confidence >= 0.5 ? "text-amber-600 dark:text-amber-400" :
+                              "text-red-600 dark:text-red-400",
                             )}>
-                              <span className={cn(
-                                "size-1.5 rounded-full",
-                                prec.resolutionStatus === "RESOLVED" ? "bg-green-500" :
-                                prec.resolutionStatus === "MITIGATED" ? "bg-amber-500" : "bg-zinc-500"
-                              )} />
-                              {prec.resolutionStatus}
+                              {(prec.confidence * 100).toFixed(0)}%
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-muted-foreground text-xs font-mono">
-                            {new Date(prec.createdAt).toLocaleDateString()}
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground font-mono">
+                            v{prec.version}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground font-mono">
+                            {prec.decisionDate
+                              ? new Date(prec.decisionDate).toLocaleDateString()
+                              : new Date(prec.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-muted-foreground">
+                            {prec.supportingEvidence.length} items
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </Panel>
 
-            {/* Right Column: Precedent Investigation Dashboard Detail Panel */}
-            <AnimatePresence mode="wait">
-              {selectedPrecedent && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full lg:w-[420px] shrink-0 border border-border bg-background rounded-xl p-5 shadow-lg relative"
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between border-t px-6 py-3">
+                    <span className="text-xs text-muted-foreground">
+                      Page {page} of {totalPages} ({total} total)
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setPage(1)}
+                        disabled={page <= 1}
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronsLeft className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </button>
+                      <span className="text-xs font-mono px-2 text-foreground">{page}</span>
+                      <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronRightIcon className="size-4" />
+                      </button>
+                      <button
+                        onClick={() => setPage(totalPages)}
+                        disabled={page >= totalPages}
+                        className="p-1.5 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronsLeft className="size-4 rotate-180" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </Panel>
+
+          {/* Detail Panel */}
+          <AnimatePresence mode="wait">
+            {selectedPrecedent && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="w-full lg:w-[460px] shrink-0 border border-border bg-background rounded-xl p-5 shadow-lg relative max-h-[80vh] overflow-y-auto"
+              >
+                <button
+                  onClick={() => setSelectedPrecedent(null)}
+                  className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <button
-                    onClick={() => setSelectedPrecedent(null)}
-                    className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="size-4" />
-                  </button>
+                  <X className="size-4" />
+                </button>
 
-                  <div className="flex items-center gap-2 mb-3">
-                    <Bookmark className="text-amber-500 size-4" />
-                    <span className="text-[10px] font-mono font-bold tracking-widest text-muted-foreground uppercase">
-                      PRECEDENT INVESTIGATION
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Bookmark className="text-amber-500 size-4" />
+                  <span className="text-[10px] font-mono font-bold tracking-widest text-muted-foreground uppercase">
+                    PRECEDENT DETAIL
+                  </span>
+                  <span className="ml-auto text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                    v{selectedPrecedent.version}
+                  </span>
+                </div>
 
-                  <h3 className="text-foreground text-base font-extrabold tracking-tight mb-2 pr-6">
-                    {selectedPrecedent.title}
-                  </h3>
+                <h3 className="text-foreground text-base font-extrabold tracking-tight mb-2 pr-6">
+                  {selectedPrecedent.title}
+                </h3>
 
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-[10px] font-mono font-semibold tracking-wide uppercase",
-                      selectedPrecedent.type === "FAILURE" ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-400" :
-                      selectedPrecedent.type === "SUCCESSFUL_DESIGN" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-400" :
-                      selectedPrecedent.type === "REGULATORY_PRECEDENT" ? "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-400" :
-                      "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-400"
-                    )}>
-                      {selectedPrecedent.type.replace("_", " ")}
-                    </span>
-                    <span className="bg-muted text-muted-foreground text-[10px] font-mono px-2 py-0.5 rounded">
-                      ID: {selectedPrecedent.id}
-                    </span>
-                  </div>
+                <p className="text-muted-foreground text-xs leading-relaxed mb-4 border-b pb-4">
+                  {selectedPrecedent.summary || selectedPrecedent.engineeringQuestion || "No summary provided."}
+                </p>
 
-                  <p className="text-muted-foreground text-xs leading-relaxed mb-4 border-b pb-4">
-                    {selectedPrecedent.description}
-                  </p>
-
-                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                    {/* Explainability & Relevance */}
+                <div className="space-y-4">
+                  {/* Engineering Question */}
+                  {selectedPrecedent.engineeringQuestion && (
                     <div>
                       <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
-                        EXPLAINABILITY & RELEVANCE
+                        Engineering Question
                       </span>
-                      <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3 text-xs leading-relaxed text-foreground">
-                        <span className="font-semibold block text-amber-600 dark:text-amber-400 mb-1">
-                          Relevance Rationale:
-                        </span>
-                        {selectedPrecedent.whyRelevant || "Retrieved based on standard system indexing metrics."}
+                      <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 text-xs text-foreground">
+                        {selectedPrecedent.engineeringQuestion}
                       </div>
                     </div>
+                  )}
 
-                    {/* Confidence & Evidence Strength Indicator */}
+                  {/* Decision Made */}
+                  {selectedPrecedent.decisionMade && (
                     <div>
-                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
-                        DETERMINISTIC STRENGTH RATINGS
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Decision Made
                       </span>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="border rounded-lg p-2.5 bg-zinc-50/50 dark:bg-zinc-900/30">
-                          <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-medium mb-1">
-                            <ShieldCheck className="size-3.5 text-amber-500" />
-                            <span>CONFIDENCE</span>
+                      <p className="text-sm text-foreground">{selectedPrecedent.decisionMade}</p>
+                    </div>
+                  )}
+
+                  {/* Evidence Used */}
+                  {selectedPrecedent.supportingEvidence.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Evidence Used ({selectedPrecedent.supportingEvidence.length})
+                      </span>
+                      <div className="space-y-1">
+                        {selectedPrecedent.supportingEvidence.map((ev, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-foreground bg-zinc-50 dark:bg-zinc-900 border rounded px-2.5 py-1.5">
+                            <FileText className="size-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate">{ev}</span>
                           </div>
-                          <span className="text-lg font-extrabold font-mono text-foreground">
-                            {(selectedPrecedent.confidenceScore * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="border rounded-lg p-2.5 bg-zinc-50/50 dark:bg-zinc-900/30">
-                          <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-medium mb-1">
-                            <ShieldAlert className="size-3.5 text-blue-500" />
-                            <span>EVIDENCE RATIO</span>
-                          </div>
-                          <span className="text-lg font-extrabold font-mono text-foreground">
-                            {((selectedPrecedent.evidenceStrength ?? selectedPrecedent.confidenceScore) * 100).toFixed(0)}%
-                          </span>
-                        </div>
+                        ))}
                       </div>
                     </div>
+                  )}
 
-                    {/* Debunked Assumptions Rejected */}
-                    {selectedPrecedent.assumptionsRejected && selectedPrecedent.assumptionsRejected.length > 0 && (
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
-                          ASSUMPTIONS DEBUNKED & REJECTED
-                        </span>
-                        <div className="bg-red-500/5 border border-red-500/15 rounded-lg p-3">
-                          <ul className="space-y-1.5">
-                            {selectedPrecedent.assumptionsRejected.map((as, index) => (
-                              <li key={index} className="text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
-                                <span className="text-red-500 font-bold shrink-0 mt-0.5">✕</span>
-                                <span>{as}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+                  {/* Contradictions */}
+                  {selectedPrecedent.contradictions.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Contradictions ({selectedPrecedent.contradictions.length})
+                      </span>
+                      <div className="space-y-1">
+                        {selectedPrecedent.contradictions.map((c, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-red-700 dark:text-red-400 bg-red-500/5 border border-red-500/10 rounded px-2.5 py-1.5">
+                            <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+                            <span>{c}</span>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {/* Knowledge Graph Traversed Paths */}
-                    {selectedPrecedent.graphRelationshipsTraversed && selectedPrecedent.graphRelationshipsTraversed.length > 0 && (
+                  {/* Missing Evidence */}
+                  {selectedPrecedent.missingEvidence.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Missing Evidence ({selectedPrecedent.missingEvidence.length})
+                      </span>
+                      <div className="space-y-1">
+                        {selectedPrecedent.missingEvidence.map((m, i) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/5 border border-amber-500/10 rounded px-2.5 py-1.5">
+                            <XCircle className="size-3.5 shrink-0 mt-0.5" />
+                            <span>{m}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Outcome */}
+                  {selectedPrecedent.outcome && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Outcome
+                      </span>
+                      <div className="bg-green-500/5 border border-green-500/10 rounded-lg p-3 text-sm text-foreground">
+                        {selectedPrecedent.outcome}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lessons Learned */}
+                  {selectedPrecedent.lessonsLearned.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Lessons Learned
+                      </span>
+                      <ul className="space-y-1">
+                        {selectedPrecedent.lessonsLearned.map((lesson, i) => (
+                          <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                            <span className="text-amber-500 mt-0.5">&bull;</span>
+                            {lesson}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Linked References */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedPrecedent.relatedSuppliers.length > 0 && (
                       <div>
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
-                          KNOWLEDGE GRAPH PATHS TRAVERSED
-                        </span>
-                        <div className="space-y-1">
-                          {selectedPrecedent.graphRelationshipsTraversed.map((path, idx) => (
-                            <div key={idx} className="bg-muted/40 rounded px-2.5 py-1.5 text-[11px] font-mono flex items-center gap-1.5 text-foreground leading-tight">
-                              <Network className="size-3.5 text-muted-foreground shrink-0" />
-                              <span>{path}</span>
-                            </div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Suppliers</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedSuppliers.map((s) => (
+                            <span key={s} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{s}</span>
                           ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Rule Engine Compliance Checks */}
-                    {selectedPrecedent.rulesEvaluated && selectedPrecedent.rulesEvaluated.length > 0 && (
+                    {selectedPrecedent.relatedComponents.length > 0 && (
                       <div>
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
-                          RULE ENGINE COMPLIANCE CHECKS
-                        </span>
-                        <div className="border border-dashed rounded-lg p-2.5 bg-zinc-50/20">
-                          <ul className="space-y-1.5">
-                            {selectedPrecedent.rulesEvaluated.map((re, i) => (
-                              <li key={i} className="text-[11px] text-foreground flex gap-2 items-start leading-relaxed">
-                                <CheckCircle2 className="text-green-500 size-3.5 shrink-0 mt-0.5" />
-                                <span>{re}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Evidence & Verification Documents */}
-                    {selectedPrecedent.evidenceMetadata && (
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1.5 tracking-wider">
-                          VERIFIABLE EVIDENCE CHAINS
-                        </span>
-                        <div className="space-y-1.5">
-                          {selectedPrecedent.evidenceMetadata.documents?.map((doc) => (
-                            <div key={doc} className="flex items-center gap-2 text-xs text-foreground bg-zinc-50 dark:bg-zinc-900 border rounded px-2.5 py-1.5">
-                              <FileText className="size-3.5 text-blue-500" />
-                              <span className="font-medium truncate">{doc}</span>
-                              <span className="text-[9px] font-mono text-green-600 bg-green-500/10 px-1 py-0.2 rounded ml-auto">VERIFIED</span>
-                            </div>
-                          ))}
-                          {selectedPrecedent.evidenceMetadata.standards?.map((std) => (
-                            <div key={std} className="flex items-center gap-2 text-xs text-foreground bg-zinc-50 dark:bg-zinc-900 border rounded px-2.5 py-1.5">
-                              <GitBranch className="size-3.5 text-purple-500" />
-                              <span className="font-medium truncate">{std}</span>
-                              <span className="text-[9px] font-mono text-purple-600 bg-purple-500/10 px-1 py-0.2 rounded ml-auto">STANDARD</span>
-                            </div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Components</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedComponents.map((c) => (
+                            <span key={c} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{c}</span>
                           ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Engineering Memory & Version Audit Trail */}
-                    {selectedPrecedent.auditTrail && selectedPrecedent.auditTrail.length > 0 && (
-                      <div className="border-t pt-4">
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-2 tracking-wider">
-                          MEMORY AUDIT TRAIL & SYSTEM EVENTS
-                        </span>
-                        <div className="relative border-l pl-3 space-y-3.5">
-                          {selectedPrecedent.auditTrail.map((log) => (
-                            <div key={log.id} className="relative text-xs">
-                              {/* Dot indicator */}
-                              <div className="absolute -left-[16.5px] top-1 size-2.5 bg-amber-500 rounded-full border border-background shadow-sm" />
-                              <div className="flex flex-col">
-                                <span className="font-bold text-foreground">
-                                  {log.action.replace("_", " ")}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
-                                  <Clock className="size-3" />
-                                  {new Date(log.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
+                    {selectedPrecedent.relatedStandards.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Standards</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedStandards.map((s) => (
+                            <span key={s} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{s}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedPrecedent.relatedCertifications.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Certifications</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedCertifications.map((c) => (
+                            <span key={c} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{c}</span>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </Section>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedPrecedent.relatedProjects.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Projects</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedProjects.map((p) => (
+                            <span key={p} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selectedPrecedent.relatedDocuments.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Documents</span>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedPrecedent.relatedDocuments.map((d) => (
+                            <span key={d} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{d}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedPrecedent.relatedRequirements.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1">Requirements</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedPrecedent.relatedRequirements.map((r) => (
+                          <span key={r} className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{r}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timeline */}
+                  <div className="border-t pt-3">
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-2 tracking-wider">
+                      Timeline
+                    </span>
+                    <div className="space-y-2">
+                      {selectedPrecedent.decisionDate && (
+                        <div className="flex items-center gap-2 text-xs text-foreground">
+                          <Calendar className="size-3.5 text-muted-foreground" />
+                          <span className="font-medium">Decision Date:</span>
+                          <span className="text-muted-foreground">
+                            {new Date(selectedPrecedent.decisionDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      {selectedPrecedent.decisionOwner && (
+                        <div className="flex items-center gap-2 text-xs text-foreground">
+                          <User className="size-3.5 text-muted-foreground" />
+                          <span className="font-medium">Decision Owner:</span>
+                          <span className="text-muted-foreground">{selectedPrecedent.decisionOwner}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-foreground">
+                        <Clock className="size-3.5 text-muted-foreground" />
+                        <span className="font-medium">Created:</span>
+                        <span className="text-muted-foreground">
+                          {new Date(selectedPrecedent.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-foreground">
+                        <Clock className="size-3.5 text-muted-foreground" />
+                        <span className="font-medium">Updated:</span>
+                        <span className="text-muted-foreground">
+                          {new Date(selectedPrecedent.updatedAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Version History / Audit */}
+                  {precedentVersions.length > 0 && (
+                    <div className="border-t pt-3">
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-2 tracking-wider">
+                        Version History ({precedentVersions.length})
+                      </span>
+                      <div className="relative border-l pl-3 space-y-3">
+                        {precedentVersions.map((v) => (
+                          <div key={v.id} className="relative text-xs">
+                            <div className="absolute -left-[16.5px] top-1 size-2.5 bg-amber-500 rounded-full border border-background shadow-sm" />
+                            <div className="flex flex-col">
+                              <span className="font-bold text-foreground">v{v.version}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {new Date(v.createdAt).toLocaleString()}
+                              </span>
+                              {v.changeDescription && (
+                                <span className="text-muted-foreground mt-0.5">{v.changeDescription}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  {selectedPrecedent.tags.length > 0 && (
+                    <div className="border-t pt-3">
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase block mb-1 tracking-wider">
+                        Tags
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedPrecedent.tags.map((tag) => (
+                          <span key={tag} className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                            <Tag className="size-2.5" />
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </Stack>
 
-      {/* Record Precedent Modal Form */}
+      {/* Record Precedent Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-background border-border w-full max-w-2xl overflow-hidden rounded-xl border p-6 shadow-xl"
+            className="bg-background border-border w-full max-w-3xl overflow-hidden rounded-xl border p-6 shadow-xl my-8"
           >
             <div className="mb-4 flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Bookmark className="text-amber-500 size-5" />
                 <h2 className="text-foreground text-lg font-bold">Record Engineering Precedent</h2>
               </div>
-              <button
-                onClick={() => setIsFormOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-lg font-bold"
-              >
-                ✕
-              </button>
+              <button onClick={() => setIsFormOpen(false)} className="text-muted-foreground hover:text-foreground text-lg font-bold">&times;</button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+            <form onSubmit={handleFormSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               {formError && (
-                <div className="bg-red-500/5 border border-red-500/20 text-red-700 dark:text-red-400 p-3 rounded-lg text-xs">
-                  {formError}
-                </div>
+                <div className="bg-red-500/5 border border-red-500/20 text-red-700 dark:text-red-400 p-3 rounded-lg text-xs">{formError}</div>
               )}
               {formSuccess && (
                 <div className="bg-green-500/5 border border-green-500/20 text-green-700 dark:text-green-400 p-3 rounded-lg text-xs">
-                  ✓ Precedent recorded successfully. Engineering memory updated.
+                  Precedent recorded successfully. Engineering memory updated.
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="text-foreground text-xs font-semibold block mb-1">Precedent Title *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Flight 22 Actuator O-Ring Thermal Shrinkage"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  />
+                  <label className="text-foreground text-xs font-semibold block mb-1">Title *</label>
+                  <input type="text" required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
-
-                <div>
-                  <label className="text-foreground text-xs font-semibold block mb-1">Precedent Type *</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as PrecedentType })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  >
-                    <option value="FAILURE">Failure / Incident Mode</option>
-                    <option value="SUCCESSFUL_DESIGN">Successful Design Baseline</option>
-                    <option value="REGULATORY_PRECEDENT">Regulatory Standard</option>
-                    <option value="SUPPLIER_HISTORY">Supplier Defect / History</option>
-                  </select>
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Summary</label>
+                  <textarea rows={2} value={formData.summary} onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
-
-                <div>
-                  <label className="text-foreground text-xs font-semibold block mb-1">Applicable Systems (comma separated) *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Fuel System, Propulsion"
-                    value={formData.applicableSystemsStr}
-                    onChange={(e) => setFormData({ ...formData, applicableSystemsStr: e.target.value })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  />
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Engineering Question</label>
+                  <textarea rows={2} value={formData.engineeringQuestion} onChange={(e) => setFormData({ ...formData, engineeringQuestion: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Decision Made</label>
+                  <textarea rows={2} value={formData.decisionMade} onChange={(e) => setFormData({ ...formData, decisionMade: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Outcome</label>
+                  <textarea rows={2} value={formData.outcome} onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-foreground text-xs font-semibold block mb-1">Lessons Learned (one per line)</label>
+                  <textarea rows={3} value={formData.lessonsLearned} onChange={(e) => setFormData({ ...formData, lessonsLearned: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
               </div>
-
-              <div>
-                <label className="text-foreground text-xs font-semibold block mb-1">Problem Description / Abstract *</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Provide a detailed abstract of the engineering precedent."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                />
-              </div>
-
-              {formData.type === "FAILURE" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-foreground text-xs font-semibold block mb-1">Root Cause Analysis</label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Material embrittlement under extreme low temps..."
-                      value={formData.rootCause}
-                      onChange={(e) => setFormData({ ...formData, rootCause: e.target.value })}
-                      className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-foreground text-xs font-semibold block mb-1">Corrective Actions Required</label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Mandate non-destructive ultrasound testing..."
-                      value={formData.correctiveAction}
-                      onChange={(e) => setFormData({ ...formData, correctiveAction: e.target.value })}
-                      className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="text-foreground text-xs font-semibold block mb-1">Verification Status</label>
-                  <select
-                    value={formData.resolutionStatus}
-                    onChange={(e) => setFormData({ ...formData, resolutionStatus: e.target.value })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  >
-                    <option value="RESOLVED">Resolved</option>
-                    <option value="MITIGATED">Mitigated</option>
-                    <option value="MONITORED">Monitored</option>
-                  </select>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Suppliers (comma sep)</label>
+                  <input type="text" value={formData.relatedSuppliers} onChange={(e) => setFormData({ ...formData, relatedSuppliers: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
-
                 <div>
-                  <label className="text-foreground text-xs font-semibold block mb-1">Confidence Weight</label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    max="1"
-                    value={formData.confidenceScore}
-                    onChange={(e) => setFormData({ ...formData, confidenceScore: parseFloat(e.target.value) })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none font-mono"
-                  />
+                  <label className="text-foreground text-xs font-semibold block mb-1">Components (comma sep)</label>
+                  <input type="text" value={formData.relatedComponents} onChange={(e) => setFormData({ ...formData, relatedComponents: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
-
                 <div>
-                  <label className="text-foreground text-xs font-semibold block mb-1">Linked Standard Tags</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. NASA-STD-5001"
-                    value={formData.standardsStr}
-                    onChange={(e) => setFormData({ ...formData, standardsStr: e.target.value })}
-                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                  />
+                  <label className="text-foreground text-xs font-semibold block mb-1">Standards (comma sep)</label>
+                  <input type="text" value={formData.relatedStandards} onChange={(e) => setFormData({ ...formData, relatedStandards: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Certifications (comma sep)</label>
+                  <input type="text" value={formData.relatedCertifications} onChange={(e) => setFormData({ ...formData, relatedCertifications: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Projects (comma sep)</label>
+                  <input type="text" value={formData.relatedProjects} onChange={(e) => setFormData({ ...formData, relatedProjects: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Tags (comma sep)</label>
+                  <input type="text" value={formData.tags} onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Decision Date</label>
+                  <input type="date" value={formData.decisionDate} onChange={(e) => setFormData({ ...formData, decisionDate: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Decision Owner</label>
+                  <input type="text" value={formData.decisionOwner} onChange={(e) => setFormData({ ...formData, decisionOwner: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Confidence (0-1)</label>
+                  <input type="number" step="0.05" min="0" max="1" value={formData.confidence} onChange={(e) => setFormData({ ...formData, confidence: parseFloat(e.target.value) || 0 })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none font-mono" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Supporting Evidence (one per line)</label>
+                  <textarea rows={3} value={formData.supportingEvidence} onChange={(e) => setFormData({ ...formData, supportingEvidence: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="text-foreground text-xs font-semibold block mb-1">Contradictions (one per line)</label>
+                  <textarea rows={3} value={formData.contradictions} onChange={(e) => setFormData({ ...formData, contradictions: e.target.value })}
+                    className="bg-zinc-50 dark:bg-zinc-900 border-border text-foreground w-full rounded-lg border px-3 py-2 text-sm outline-none" />
                 </div>
               </div>
 
               <div className="flex justify-end gap-2 border-t pt-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setIsFormOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 px-5"
-                >
+                <Button type="button" variant="secondary" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+                <Button type="submit" className="bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 px-5">
                   Confirm & Write
                 </Button>
               </div>
