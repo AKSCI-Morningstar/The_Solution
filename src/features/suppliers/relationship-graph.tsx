@@ -20,14 +20,7 @@ interface Props {
   onDelete?: (id: string) => void;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: "success",
-  INACTIVE: "secondary",
-  PENDING: "warning",
-  TERMINATED: "destructive",
-};
-
-export function RelationshipGraph({ relationships, onDelete }: Props) {
+export function RelationshipGraph({ relationships, supplierId, onDelete }: Props) {
   return (
     <Stack gap={3}>
       <div className="flex items-center gap-2">
@@ -63,31 +56,21 @@ export function RelationshipGraph({ relationships, onDelete }: Props) {
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary" size="sm">
-                    {rel.direction === "INBOUND"
-                      ? "Inbound"
-                      : rel.direction === "OUTBOUND"
-                        ? "Outbound"
-                        : "Bidirectional"}
+                    {rel.sourceSupplierId === supplierId ? "Outbound" : "Inbound"}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <span className="text-muted-foreground text-xs">
-                    {rel.relatedSupplierId
-                      ? `Supplier: ${rel.relatedSupplierId.slice(0, 8)}`
-                      : rel.relatedOrganizationId
-                        ? `Org: ${rel.relatedOrganizationId.slice(0, 8)}`
-                        : "—"}
+                    {rel.sourceSupplierId === supplierId
+                      ? (rel.targetSupplier?.name ??
+                        `Supplier: ${rel.targetSupplierId.slice(0, 8)}`)
+                      : (rel.sourceSupplier?.name ??
+                        `Supplier: ${rel.sourceSupplierId.slice(0, 8)}`)}
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={
-                      (STATUS_BADGE[rel.status] ?? "secondary") as
-                        "success" | "warning" | "destructive" | "secondary"
-                    }
-                    size="sm"
-                  >
-                    {rel.status}
+                  <Badge variant="secondary" size="sm">
+                    Active
                   </Badge>
                 </TableCell>
                 <TableCell>

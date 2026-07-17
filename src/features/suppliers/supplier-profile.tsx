@@ -1,7 +1,6 @@
 "use client";
 
 import { Building2, MapPin, Globe, ExternalLink } from "lucide-react";
-import { cn } from "@/shared/utils";
 import { Badge, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { Panel, Stack } from "@/components/layout";
 import { SUPPLIER_TYPE_LABELS, SUPPLIER_STATUS_LABELS } from "@/server/suppliers/constants";
@@ -34,32 +33,6 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function RatingBar({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value?: number | null;
-  color: string;
-}) {
-  if (value == null) return null;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-xs">{label}</span>
-        <span className={cn("text-xs font-medium", color)}>{value.toFixed(1)}</span>
-      </div>
-      <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-        <div
-          className={cn("h-full rounded-full transition-all", color.replace("text-", "bg-"))}
-          style={{ width: `${Math.min(value * 20, 100)}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 export function SupplierProfile({ supplier }: Props) {
   return (
     <Stack gap={6}>
@@ -79,17 +52,22 @@ export function SupplierProfile({ supplier }: Props) {
               {SUPPLIER_STATUS_LABELS[supplier.status] ?? supplier.status}
             </Badge>
             <Badge variant="secondary">
-              {SUPPLIER_TYPE_LABELS[supplier.type] ?? supplier.type}
+              {SUPPLIER_TYPE_LABELS[supplier.supplierType] ?? supplier.supplierType}
             </Badge>
           </div>
           <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{supplier.supplierCode}</code>
-            {supplier.tier && <span>Tier {supplier.tier}</span>}
-            {supplier.industry && <span>{supplier.industry}</span>}
-            {(supplier.city || supplier.country) && (
+            <code className="bg-muted rounded px-1.5 py-0.5 text-xs">{supplier.identifier}</code>
+            {supplier.industrySectors?.[0] && <span>{supplier.industrySectors[0]}</span>}
+            {(supplier.locations?.[0]?.city || supplier.locations?.[0]?.country) && (
               <span className="flex items-center gap-1">
                 <MapPin className="size-3" />
-                {[supplier.city, supplier.state, supplier.country].filter(Boolean).join(", ")}
+                {[
+                  supplier.locations[0].city,
+                  supplier.locations[0].state,
+                  supplier.locations[0].country,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
               </span>
             )}
           </div>
@@ -125,7 +103,10 @@ export function SupplierProfile({ supplier }: Props) {
 
           <Panel padding="md">
             <RelationshipGraph
-              relationships={supplier.relationships ?? []}
+              relationships={[
+                ...(supplier.outgoingRelationships ?? []),
+                ...(supplier.incomingRelationships ?? []),
+              ]}
               supplierId={supplier.id}
             />
           </Panel>
@@ -134,56 +115,18 @@ export function SupplierProfile({ supplier }: Props) {
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle>Ratings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Stack gap={3}>
-                <RatingBar label="Quality" value={supplier.qualityRating} color="text-success" />
-                <RatingBar label="Delivery" value={supplier.deliveryRating} color="text-primary" />
-                <RatingBar label="Cost" value={supplier.costRating} color="text-warning" />
-                <RatingBar label="Compliance" value={supplier.complianceRating} color="text-info" />
-                {supplier.overallRating != null && (
-                  <div className="border-border mt-2 flex items-center justify-between border-t pt-2">
-                    <span className="text-foreground text-xs font-medium">Overall</span>
-                    <span className="text-lg font-bold">{supplier.overallRating.toFixed(1)}</span>
-                  </div>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">DUNS</span>
-                  <span className="text-foreground text-xs">{supplier.dunsNumber ?? "—"}</span>
+                  <span className="text-foreground text-xs">{supplier.duns ?? "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground text-xs">NAICS</span>
-                  <span className="text-foreground text-xs">{supplier.naicsCode ?? "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Payment Terms</span>
-                  <span className="text-foreground text-xs">{supplier.paymentTerms ?? "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Shipping Terms</span>
-                  <span className="text-foreground text-xs">{supplier.shippingTerms ?? "—"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Lead Time</span>
                   <span className="text-foreground text-xs">
-                    {supplier.leadTimeDays ? `${supplier.leadTimeDays} days` : "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Employees</span>
-                  <span className="text-foreground text-xs">
-                    {supplier.employeeCount?.toLocaleString() ?? "—"}
+                    {supplier.naicsCodes?.join(", ") ?? "—"}
                   </span>
                 </div>
               </div>
@@ -192,89 +135,29 @@ export function SupplierProfile({ supplier }: Props) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Risk Assessment</CardTitle>
+              <CardTitle>Notes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Risk Level</span>
-                  <Badge
-                    variant={
-                      (supplier.riskLevel === "HIGH" || supplier.riskLevel === "CRITICAL"
-                        ? "destructive"
-                        : supplier.riskLevel === "MEDIUM"
-                          ? "warning"
-                          : "success") as "destructive" | "warning" | "success"
-                    }
-                    size="sm"
-                  >
-                    {supplier.riskLevel ?? "Unknown"}
-                  </Badge>
-                </div>
-                {supplier.riskScore != null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-xs">Risk Score</span>
-                    <span className="text-foreground text-xs">{supplier.riskScore.toFixed(1)}</span>
-                  </div>
-                )}
-                {supplier.lastAssessmentDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-xs">Last Assessment</span>
-                    <span className="text-foreground text-xs">
-                      {new Date(supplier.lastAssessmentDate).toLocaleDateString()}
+              <div className="flex flex-col gap-4">
+                {supplier.riskNotes && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs font-medium uppercase">
+                      Risk Notes
                     </span>
+                    <span className="text-foreground text-xs">{supplier.riskNotes}</span>
                   </div>
                 )}
-                {supplier.nextAssessmentDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground text-xs">Next Assessment</span>
-                    <span className="text-foreground text-xs">
-                      {new Date(supplier.nextAssessmentDate).toLocaleDateString()}
+                {supplier.engineeringNotes && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs font-medium uppercase">
+                      Engineering Notes
                     </span>
+                    <span className="text-foreground text-xs">{supplier.engineeringNotes}</span>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Contract</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Start</span>
-                  <span className="text-foreground text-xs">
-                    {supplier.contractStartDate
-                      ? new Date(supplier.contractStartDate).toLocaleDateString()
-                      : "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">End</span>
-                  <span className="text-foreground text-xs">
-                    {supplier.contractEndDate
-                      ? new Date(supplier.contractEndDate).toLocaleDateString()
-                      : "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Value</span>
-                  <span className="text-foreground text-xs">
-                    {supplier.contractValue
-                      ? `${supplier.currency ?? "USD"} ${supplier.contractValue.toLocaleString()}`
-                      : "—"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground text-xs">Onboarded</span>
-                  <span className="text-foreground text-xs">
-                    {supplier.onboardingDate
-                      ? new Date(supplier.onboardingDate).toLocaleDateString()
-                      : "—"}
-                  </span>
-                </div>
+                {!supplier.riskNotes && !supplier.engineeringNotes && (
+                  <span className="text-muted-foreground text-sm">No notes available.</span>
+                )}
               </div>
             </CardContent>
           </Card>

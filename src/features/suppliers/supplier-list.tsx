@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, ChevronRight, Search, Loader2, MapPin, Award, Star } from "lucide-react";
+import { Building2, ChevronRight, Search, Loader2, MapPin, Award } from "lucide-react";
 import {
   Badge,
   Input,
@@ -15,7 +15,6 @@ import {
   TableCell,
 } from "@/components/ui";
 import { Panel, Stack } from "@/components/layout";
-import { cn } from "@/shared/utils";
 import { SUPPLIER_TYPE_LABELS, SUPPLIER_STATUS_LABELS } from "@/server/suppliers/constants";
 import type { SupplierDTO } from "./types";
 
@@ -35,17 +34,6 @@ const STATUS_BADGE: Record<string, string> = {
   INACTIVE: "secondary",
   DISQUALIFIED: "destructive",
 };
-
-function RatingStars({ rating }: { rating?: number | null }) {
-  if (rating == null) return null;
-  const color = rating >= 4 ? "text-success" : rating >= 3 ? "text-warning" : "text-destructive";
-  return (
-    <div className="flex items-center gap-1">
-      <Star className={cn("size-3", color)} />
-      <span className={cn("text-xs font-medium", color)}>{rating.toFixed(1)}</span>
-    </div>
-  );
-}
 
 export function SupplierList({
   suppliers,
@@ -105,7 +93,6 @@ export function SupplierList({
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead>Rating</TableHead>
                 <TableHead>Certifications</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -120,20 +107,22 @@ export function SupplierList({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-foreground text-sm font-medium">{supplier.name}</span>
-                        {supplier.industry && (
-                          <span className="text-muted-foreground text-xs">{supplier.industry}</span>
+                        {supplier.industrySectors?.[0] && (
+                          <span className="text-muted-foreground text-xs">
+                            {supplier.industrySectors[0]}
+                          </span>
                         )}
                       </div>
                     </Link>
                   </TableCell>
                   <TableCell>
                     <code className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs">
-                      {supplier.supplierCode}
+                      {supplier.identifier}
                     </code>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" size="sm">
-                      {SUPPLIER_TYPE_LABELS[supplier.type] ?? supplier.type}
+                      {SUPPLIER_TYPE_LABELS[supplier.supplierType] ?? supplier.supplierType}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -148,17 +137,16 @@ export function SupplierList({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {supplier.city || supplier.country ? (
+                    {supplier.locations?.[0]?.city || supplier.locations?.[0]?.country ? (
                       <div className="text-muted-foreground flex items-center gap-1 text-xs">
                         <MapPin className="size-3" />
-                        {[supplier.city, supplier.country].filter(Boolean).join(", ")}
+                        {[supplier.locations[0].city, supplier.locations[0].country]
+                          .filter(Boolean)
+                          .join(", ")}
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <RatingStars rating={supplier.overallRating} />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

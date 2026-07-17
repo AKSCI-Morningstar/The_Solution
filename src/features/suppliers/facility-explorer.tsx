@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, MapPin, Plus, Trash2, Users, Maximize2, CalendarDays } from "lucide-react";
+import { Building2, MapPin, Plus, Trash2, Users, Maximize2 } from "lucide-react";
 import { Button, Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Panel, Stack } from "@/components/layout";
 import { FACILITY_TYPE_LABELS } from "@/server/suppliers/constants";
@@ -76,22 +76,16 @@ export function FacilityExplorer({ facilities, onAdd, onDelete }: Props) {
                 )}
                 {expandedId === facility.id && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    {facility.employeeCount != null && (
+                    {facility.employees != null && (
                       <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                         <Users className="size-3" />
-                        {facility.employeeCount} employees
+                        {facility.employees} employees
                       </div>
                     )}
-                    {facility.squareFootage != null && (
+                    {facility.areaSqFt != null && (
                       <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                         <Maximize2 className="size-3" />
-                        {facility.squareFootage.toLocaleString()} sq ft
-                      </div>
-                    )}
-                    {facility.yearEstablished != null && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                        <CalendarDays className="size-3" />
-                        Est. {facility.yearEstablished}
+                        {facility.areaSqFt.toLocaleString()} sq ft
                       </div>
                     )}
                   </div>
