@@ -55,6 +55,43 @@ export const SIDEBAR_NAV: SidebarNavEntry[] = [
     items: [
       { label: "Documents", href: ROUTES.documents, icon: "FileText" },
       { label: "Suppliers", href: ROUTES.suppliers, icon: "Truck" },
+      { label: "Drawings Compare", href: "/drawings", icon: "Layers" },
+      { label: "Evidence Search", href: "/copilot", icon: "Brain" },
+      { label: "IP & ZK Sourcing", href: "/marketplace", icon: "Tags" },
+      { label: "Metrology Registry", href: "/telemetry", icon: "Cog" },
+      { label: "Attest Compliance", href: "/compliance", icon: "ShieldCheck" },
+      { label: "Program Risks", href: "/reports/risk", icon: "BarChart3" },
+    ],
+  },
+  {
+    label: "Intelligence & Platform",
+    icon: "Brain",
+    items: [
+      { label: "Program Health", href: "/programs", icon: "Activity" },
+      { label: "Decision Audit Trail", href: "/decisions", icon: "GitCommit" },
+      {
+        label: "Supplier Risk Predictor",
+        href: "/intelligence/supplier-risk",
+        icon: "AlertTriangle",
+      },
+      { label: "Design Pattern Library", href: "/patterns", icon: "Layers" },
+      { label: "Cross-Program Insights", href: "/intelligence/cross-program", icon: "TrendingUp" },
+      {
+        label: "Certification Predictor",
+        href: "/intelligence/certification-risk",
+        icon: "ShieldCheck",
+      },
+    ],
+  },
+  {
+    label: "Evidence & Governance",
+    icon: "ShieldCheck",
+    items: [
+      { label: "Validation Timeline", href: "/worldmodel", icon: "ScrollText" },
+      { label: "Expertise Ledger", href: "/tribal", icon: "FileText" },
+      { label: "Supplier Attestation", href: "/negotiation", icon: "Workflow" },
+      { label: "Lifecycle Twin", href: "/twin", icon: "Layers" },
+      { label: "Recovery Router", href: "/selfheal", icon: "Cog" },
     ],
   },
   {

@@ -15,13 +15,14 @@ export async function createContact(
 
   if (input.isPrimary) {
     await prisma.supplierContact.updateMany({
-      where: { supplierId, isPrimary: true },
+      where: { supplierId, isPrimary: true, organizationId },
       data: { isPrimary: false },
     });
   }
 
   const contact = await prisma.supplierContact.create({
     data: {
+      organizationId,
       supplierId,
       name: input.name,
       title: input.title,
@@ -55,7 +56,7 @@ export async function getContacts(supplierId: string, organizationId: string) {
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   return prisma.supplierContact.findMany({
-    where: { supplierId },
+    where: { supplierId, organizationId },
     orderBy: [{ isPrimary: "desc" }, { name: "asc" }],
   });
 }
@@ -72,13 +73,13 @@ export async function updateContact(
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const contact = await prisma.supplierContact.findFirst({
-    where: { id: contactId, supplierId },
+    where: { id: contactId, supplierId, organizationId },
   });
   if (!contact) throw new NotFoundError("SupplierContact", contactId);
 
   if (input.isPrimary) {
     await prisma.supplierContact.updateMany({
-      where: { supplierId, isPrimary: true, id: { not: contactId } },
+      where: { supplierId, isPrimary: true, id: { not: contactId }, organizationId },
       data: { isPrimary: false },
     });
   }
@@ -103,7 +104,7 @@ export async function deleteContact(contactId: string, supplierId: string, organ
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const contact = await prisma.supplierContact.findFirst({
-    where: { id: contactId, supplierId },
+    where: { id: contactId, supplierId, organizationId },
   });
   if (!contact) throw new NotFoundError("SupplierContact", contactId);
 

@@ -1,193 +1,120 @@
 import { prisma } from "@/server/db";
-import { Prisma } from "@prisma/client";
-import { ValidationError, NotFoundError } from "@/shared/errors";
-import { createPrecedent } from "../precedents/precedent-service";
 
 export interface CreateDecisionInput {
-  question: string;
-  context?: string;
   organizationId: string;
+  partId?: string;
+  supplierId?: string;
+  programId?: string;
+  decisionType: string;
+  description: string;
+  rationale: string;
+  proposedById: string;
+  reusableFor?: string[];
 }
 
-export interface UpdateDecisionInput {
-  status?: "INTAKE" | "EVIDENCE_REVIEW" | "FINALIZED";
-  subjectEntityId?: string | null;
-  supportingEvidence?: Prisma.InputJsonValue;
-  contradictions?: Prisma.InputJsonValue;
-  unresolvedGaps?: Prisma.InputJsonValue;
-  precedents?: Prisma.InputJsonValue;
-  finalDecision?: string | null;
-  rationale?: string | null;
+export interface ApproveDecisionInput {
+  decisionId: string;
+  approverId: string;
+  approvalType: "APPROVED" | "APPROVED_WITH_CONDITIONS" | "REJECTED" | "DEFERRED";
+  comment?: string;
+  conditions?: string[];
 }
 
-/**
- * Creates a new decision in the INTAKE state.
- */
+export interface DecisionMilestoneInput {
+  decisionId: string;
+  milestoneType: "FIRST_ARTICLE" | "PRODUCTION" | "PROGRAM_DELIVERY" | "FIELD_OPERATION";
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETE" | "FAILED";
+  actualOutcome?: string;
+  metrics?: Record<string, unknown>;
+}
+
 export async function createDecision(input: CreateDecisionInput) {
-  if (!input.question || !input.question.trim()) {
-    throw new ValidationError({ question: ["Question is required to start a decision workflow."] });
-  }
-
-  return prisma.decision.create({
+  return prisma.engineeringDecision.create({
     data: {
       organizationId: input.organizationId,
-      question: input.question.trim(),
-      context: input.context?.trim() || null,
-      status: "INTAKE",
+      partId: input.partId,
+      supplierId: input.supplierId,
+      programId: input.programId,
+      decisionType: input.decisionType,
+      description: input.description,
+      rationale: input.rationale,
+      proposedById: input.proposedById,
+      reusableFor: input.reusableFor || [],
+      status: "PROPOSED",
+    },
+    include: {
+      proposedBy: { select: { id: true, name: true, email: true } },
+      approvals: true,
+      milestones: true,
     },
   });
 }
 
-/**
- * Retrieves all decisions for a given organization.
- */
-export async function getDecisions(organizationId: string) {
-  return prisma.decision.findMany({
-    where: {
-      organizationId,
-      deletedAt: null,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-}
-
-/**
- * Retrieves a decision by its ID.
- */
-export async function getDecisionById(id: string, organizationId: string) {
-  const decision = await prisma.decision.findFirst({
-    where: {
-      id,
-      organizationId,
-      deletedAt: null,
-    },
-  });
-
-  if (!decision) {
-    throw new NotFoundError("Decision", id);
-  }
-
-  return decision;
-}
-
-/**
- * Updates an active decision (e.g. adding evidence, changing status).
- */
-export async function updateDecision(
-  id: string,
-  organizationId: string,
-  input: UpdateDecisionInput,
-) {
-  const decision = await getDecisionById(id, organizationId);
-
-  if (decision.status === "FINALIZED") {
-    throw new ValidationError({
-      status: ["Cannot update a decision that has already been finalized."],
-    });
-  }
-
-  if (input.status === "FINALIZED") {
-    throw new ValidationError({
-      status: ["Use finalizeDecision function to transition status to FINALIZED."],
-    });
-  }
-
-  if (input.status && !["INTAKE", "EVIDENCE_REVIEW"].includes(input.status)) {
-    throw new ValidationError({ status: [`Invalid target status transition: ${input.status}`] });
-  }
-
-  return prisma.decision.update({
-    where: { id },
+export async function approveDecision(input: ApproveDecisionInput) {
+  const approval = await prisma.decisionApproval.create({
     data: {
+      decisionId: input.decisionId,
+      approverId: input.approverId,
+      approvalType: input.approvalType,
+      comment: input.comment,
+      conditions: input.conditions || [],
+    },
+  });
+
+  const newStatus =
+    input.approvalType === "APPROVED" || input.approvalType === "APPROVED_WITH_CONDITIONS"
+      ? "APPROVED"
+      : input.approvalType === "REJECTED"
+        ? "CLOSED"
+        : "PROPOSED";
+
+  await prisma.engineeringDecision.update({
+    where: { id: input.decisionId },
+    data: { status: newStatus },
+  });
+
+  return approval;
+}
+
+export async function addDecisionMilestone(input: DecisionMilestoneInput) {
+  return prisma.decisionMilestone.create({
+    data: {
+      decisionId: input.decisionId,
+      milestoneType: input.milestoneType,
       status: input.status,
-      subjectEntityId: input.subjectEntityId !== undefined ? input.subjectEntityId : undefined,
-      supportingEvidence:
-        input.supportingEvidence !== undefined ? input.supportingEvidence : undefined,
-      contradictions: input.contradictions !== undefined ? input.contradictions : undefined,
-      unresolvedGaps: input.unresolvedGaps !== undefined ? input.unresolvedGaps : undefined,
-      precedents: input.precedents !== undefined ? input.precedents : undefined,
-      finalDecision: input.finalDecision !== undefined ? input.finalDecision : undefined,
-      rationale: input.rationale !== undefined ? input.rationale : undefined,
+      actualOutcome: input.actualOutcome,
+      metrics: input.metrics || {},
+      completedAt: input.status === "COMPLETE" ? new Date() : null,
     },
   });
 }
 
-/**
- * Validates and finalizes a decision. It sets the status to FINALIZED, stores the final decision
- * and rationale, sets a timestamp and creator, and archives it as a Historical Precedent.
- */
-export async function finalizeDecision(
-  id: string,
-  organizationId: string,
-  userId: string,
-  finalDecision: string,
-  rationale: string,
-) {
-  const decision = await getDecisionById(id, organizationId);
+export async function getDecisions(organizationId: string) {
+  return prisma.engineeringDecision.findMany({
+    where: { organizationId },
+    include: {
+      proposedBy: { select: { id: true, name: true, email: true } },
+      supplier: { select: { id: true, name: true } },
+      program: { select: { id: true, name: true, aircraft: true } },
+      approvals: { include: { approver: { select: { name: true } } } },
+      milestones: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
 
-  if (decision.status === "FINALIZED") {
-    throw new ValidationError({ status: ["This decision has already been finalized."] });
-  }
-
-  if (!finalDecision || !finalDecision.trim()) {
-    throw new ValidationError({
-      finalDecision: ["Final decision text is required to sign off and finalize."],
-    });
-  }
-
-  if (!rationale || !rationale.trim()) {
-    throw new ValidationError({
-      rationale: ["Rationale and mitigation notes are required to sign off and finalize."],
-    });
-  }
-
-  // Perform updates
-  const updatedDecision = await prisma.decision.update({
-    where: { id },
-    data: {
-      status: "FINALIZED",
-      finalDecision: finalDecision.trim(),
-      rationale: rationale.trim(),
-      finalizedAt: new Date(),
-      finalizedById: userId,
+export async function getDecisionAuditTrail(decisionId: string) {
+  return prisma.engineeringDecision.findUnique({
+    where: { id: decisionId },
+    include: {
+      proposedBy: { select: { id: true, name: true, email: true } },
+      supplier: { select: { id: true, name: true } },
+      program: { select: { id: true, name: true, aircraft: true } },
+      approvals: {
+        include: { approver: { select: { id: true, name: true } } },
+        orderBy: { approvedAt: "asc" },
+      },
+      milestones: { orderBy: { createdAt: "asc" } },
     },
   });
-
-  // Archive to Historical Precedents to connect the systems
-  try {
-    const matchedEnt = decision.subjectEntityId
-      ? await prisma.engineeringEntity.findFirst({
-          where: { id: decision.subjectEntityId, organizationId },
-        })
-      : null;
-
-    const components = matchedEnt ? [matchedEnt.name] : [];
-
-    await createPrecedent({
-      title: `Finalized Decision: ${decision.question}`,
-      summary: rationale.trim(),
-      engineeringQuestion: decision.question,
-      decisionMade: finalDecision.trim(),
-      outcome: "RESOLVED",
-      lessonsLearned: rationale.trim(),
-      confidence: 1.0,
-      tags: ["finalized-decision", matchedEnt?.entityType].filter(Boolean) as string[],
-      relatedComponents: components,
-      supportingEvidence: decision.supportingEvidence || [],
-      contradictions: decision.contradictions || [],
-      missingEvidence: decision.unresolvedGaps || [],
-      organizationId,
-      userId,
-    });
-  } catch (error) {
-    console.error(
-      "Failed to automatically archive finalized decision as historical precedent:",
-      error,
-    );
-    // Do not throw so that the main decision transaction succeeds
-  }
-
-  return updatedDecision;
 }

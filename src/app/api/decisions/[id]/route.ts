@@ -1,85 +1,81 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { validateSession } from "@/server/auth/session-service";
 import {
-  getDecisionById,
-  updateDecision,
-  finalizeDecision,
+  getDecisionAuditTrail,
+  approveDecision,
+  addDecisionMilestone,
 } from "@/server/decisions/decision-service";
-import { requireActiveOrganization } from "@/server/organizations/organization-context";
-import { getCurrentUser } from "@/server/auth";
-import { AppError } from "@/shared/errors";
 
-export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await props.params;
-    let organizationId: string | undefined;
-    try {
-      organizationId = await requireActiveOrganization();
-    } catch {
-      // Fallback
+    const session = await validateSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!organizationId) {
-      return NextResponse.json({ error: "Organization context required" }, { status: 400 });
+    const { id } = await params;
+    const auditTrail = await getDecisionAuditTrail(id);
+
+    if (!auditTrail) {
+      return NextResponse.json({ error: "Decision not found" }, { status: 404 });
     }
 
-    const data = await getDecisionById(id, organizationId);
-    return NextResponse.json({ data });
-  } catch (err: unknown) {
-    if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
-    }
-    const message = err instanceof Error ? err.message : "Failed to fetch decision";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ data: auditTrail });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
-export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await props.params;
-    const body = await req.json();
-
-    let organizationId: string | undefined;
-    let userId: string | undefined;
-    try {
-      organizationId = await requireActiveOrganization();
-      const user = await getCurrentUser();
-      userId = user?.id;
-    } catch {
-      // Fallback
+    const session = await validateSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!organizationId) {
-      return NextResponse.json({ error: "Organization context required" }, { status: 400 });
-    }
+    const { id } = await params;
+    const body = await request.json();
+    const {
+      action,
+      approvalType,
+      comment,
+      conditions,
+      milestoneType,
+      status,
+      actualOutcome,
+      metrics,
+    } = body;
 
-    let data;
-    if (body.status === "FINALIZED") {
-      if (!userId) {
-        return NextResponse.json(
-          { error: "User authentication required to finalize a decision" },
-          { status: 401 },
-        );
-      }
-      data = await finalizeDecision(id, organizationId, userId, body.finalDecision, body.rationale);
-    } else {
-      data = await updateDecision(id, organizationId, {
-        status: body.status,
-        subjectEntityId: body.subjectEntityId,
-        supportingEvidence: body.supportingEvidence,
-        contradictions: body.contradictions,
-        unresolvedGaps: body.unresolvedGaps,
-        precedents: body.precedents,
-        finalDecision: body.finalDecision,
-        rationale: body.rationale,
+    if (action === "approve") {
+      const result = await approveDecision({
+        decisionId: id,
+        approverId: session.userId,
+        approvalType: approvalType || "APPROVED",
+        comment,
+        conditions,
       });
+      return NextResponse.json({ data: result });
     }
 
-    return NextResponse.json({ data });
-  } catch (err: unknown) {
-    if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+    if (action === "milestone") {
+      const result = await addDecisionMilestone({
+        decisionId: id,
+        milestoneType: milestoneType || "FIRST_ARTICLE",
+        status: status || "COMPLETE",
+        actualOutcome,
+        metrics,
+      });
+      return NextResponse.json({ data: result });
     }
-    const message = err instanceof Error ? err.message : "Failed to update decision";
-    return NextResponse.json({ error: message }, { status: 500 });
+
+    return NextResponse.json({ error: "Invalid action type" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 },
+    );
   }
 }

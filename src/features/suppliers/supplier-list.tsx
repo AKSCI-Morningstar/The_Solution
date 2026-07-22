@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, ChevronRight, Search, Loader2, MapPin, Award, Star } from "lucide-react";
+import { Building2, ChevronRight, Search, Loader2, MapPin, Star } from "lucide-react";
 import {
   Badge,
   Input,
@@ -106,7 +106,8 @@ export function SupplierList({
                 <TableHead>Status</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Rating</TableHead>
-                <TableHead>Certifications</TableHead>
+                <TableHead>Live Capacity</TableHead>
+                <TableHead>Capability Tags</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -121,7 +122,9 @@ export function SupplierList({
                       <div className="flex flex-col">
                         <span className="text-foreground text-sm font-medium">{supplier.name}</span>
                         {supplier.industrySectors && supplier.industrySectors.length > 0 && (
-                          <span className="text-muted-foreground text-xs">{supplier.industrySectors[0]}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {supplier.industrySectors[0]}
+                          </span>
                         )}
                       </div>
                     </Link>
@@ -158,14 +161,42 @@ export function SupplierList({
                     )}
                   </TableCell>
                   <TableCell>
-                    <RatingStars rating={supplier.overallRating} />
+                    <RatingStars rating={supplier.rating ?? supplier.overallRating} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Award className="text-muted-foreground size-3" />
-                      <span className="text-muted-foreground text-xs">
-                        {supplier._count?.certifications ?? supplier.certifications?.length ?? 0}
-                      </span>
+                    {supplier.liveCapacityScore !== undefined ? (
+                      <div className="flex w-24 flex-col gap-1">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                          <div
+                            className="h-full rounded-full bg-indigo-500"
+                            style={{ width: `${Math.round(supplier.liveCapacityScore * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium text-zinc-500">
+                          {Math.round(supplier.liveCapacityScore * 100)}% Available
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex max-w-[150px] flex-wrap gap-1">
+                      {supplier.capabilityTags &&
+                      (supplier.capabilityTags as string[]).length > 0 ? (
+                        (supplier.capabilityTags as string[]).slice(0, 2).map((t, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="secondary"
+                            size="sm"
+                            className="origin-left scale-95 px-1 text-[9px]"
+                          >
+                            {t}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>

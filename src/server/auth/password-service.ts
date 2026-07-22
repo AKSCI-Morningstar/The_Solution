@@ -2,7 +2,8 @@ import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 32;
-const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+const SCRYPT_PARAMS =
+  process.env.NODE_ENV === "test" ? { N: 512, r: 8, p: 1 } : { N: 16384, r: 8, p: 1 };
 
 function serializeHash(hash: Buffer, salt: Buffer): string {
   return `${salt.toString("hex")}:${hash.toString("hex")}`;

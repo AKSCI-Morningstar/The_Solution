@@ -1,36 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/server/db";
-import { EngineeringPrecedent } from "@/features/precedents/types";
+import {
+  EngineeringPrecedent,
+  PrecedentQuery,
+  HistoricalPrecedentAuditLog,
+  PrecedentType,
+} from "@/features/precedents/types";
 import { logger } from "@/shared/logging";
 import { Prisma } from "@prisma/client";
+import { ValidationError } from "@/shared/errors";
 
-// High-fidelity seed data mapped to the new database fields
-const SEED_PRECEDENTS = [
+// High-fidelity seed data reflecting real historical engineering rationale, failures, and wisdom.
+const INITIAL_PRECEDENTS = [
   {
     id: "prec-1",
     title: "Ariane 5 Flight 501 Software Failure",
     summary:
       "Loss of launcher orientation after aerodynamic load overload due to guidance system calculation error.",
-    engineeringQuestion: "Can guidance systems cast variable data types without boundaries?",
+    engineeringQuestion:
+      "Can software variables in aerospace modules operate without protective operand boundary checkers?",
     decisionMade:
+      "Mandated protective casting handlers for all variables and HIL hardware-in-the-loop simulation runs.",
+    supportingEvidence: ["HIL Simulation Run #A501-S3", "Software Verification Test Plan"],
+    contradictions: ["Guidance system calculation mismatch warnings"],
+    missingEvidence: [],
+    outcome: "Ariane 5 platform subsequent flights successfully validated guidance stability.",
+    lessonsLearned:
       "Include protective handlers for all variable casting; run full end-to-end hardware-in-the-loop simulation of flight software.",
-    outcome: "Passed verification tests with zero operand exceptions during subsequent HIL runs.",
-    lessonsLearned: "All software variable casts must include explicit range boundary checks.",
-    confidence: 1.0,
-    tags: ["software", "guidance", "failure", "operand-overflow"],
     relatedProjects: ["Ariane 5"],
-    relatedSuppliers: ["Vibration Systems Inc"],
-    relatedRequirements: ["Requirement 1.2.4: Software Safety Boundaries"],
+    relatedSuppliers: ["Arianespace"],
+    relatedRequirements: ["DO-178C Section 6.4"],
     relatedDocuments: ["Ariane 5 Inquiry Board Report"],
     relatedComponents: ["Guidance & Control", "Software System"],
     relatedStandards: ["IEEE 754 Floating Point Standard", "DO-178C"],
-    relatedCertifications: ["DO-178C Level A Certification"],
-    supportingEvidence: [
-      "Operand error on 64-bit to 16-bit integer conversion",
-      "HIL Simulation Run #A501-S3",
-    ],
-    contradictions: ["Guidance module ran without sensor check loop"],
-    missingEvidence: ["Static check validation logs"],
+    relatedCertifications: [],
+    confidence: 1.0,
+    tags: ["software", "failure", "guidance", "overflow"],
   },
   {
     id: "prec-2",
@@ -38,54 +43,50 @@ const SEED_PRECEDENTS = [
     summary:
       "Rapid brittle fracture of high-tension structural fasteners observed during deep-water endurance trials.",
     engineeringQuestion:
-      "Is Titanium Alloy Grade 5 safe for high-stress joint fasteners in marine crevices?",
+      "Can titanium fasteners be safely used in deep-water crevices under high mechanical tension?",
     decisionMade:
-      "Apply cadmium-free galvanic plating, substitute titanium fasteners with Super Duplex Stainless Steel (PREN > 40) in mechanical joint seals.",
-    outcome: "No stress corrosion or crevice cracking detected during 18-month saltwater trial.",
+      "Mandated Super Duplex Stainless Steel (PREN > 40) fasteners and cadmium-free galvanic plating.",
+    supportingEvidence: ["Salt Spray Lab Test #9822", "Material Integrity Report"],
+    contradictions: ["Titanium stress concentration values in saline crevices"],
+    missingEvidence: ["Anodic Polarization Test Report"],
+    outcome:
+      "Super Duplex fasteners exhibited zero cracking during 12 months of saltwater exposure.",
     lessonsLearned:
-      "Titanium fasteners suffer crevice corrosion under stress in saltwater without active cathodic protection.",
-    confidence: 0.95,
-    tags: ["materials", "corrosion", "structural", "marine"],
-    relatedProjects: ["Deepwater Subsea Seal"],
-    relatedSuppliers: ["Alpha Bolt"],
-    relatedRequirements: ["Requirement 4.2: Marine Crevice Durability"],
+      "Chloride-induced stress corrosion cracking occurs in crevices with oxygen depletion under mechanically applied high stress.",
+    relatedProjects: ["Deepsea Intake Phase 2"],
+    relatedSuppliers: ["Titan Material Group"],
+    relatedRequirements: ["REQ-MAT-4.8 Crevice Safety"],
     relatedDocuments: ["Deep-Water Endurance Summary Report"],
-    relatedComponents: ["Structure", "Material Selection"],
+    relatedComponents: ["Structure", "Material Selection", "Fasteners"],
     relatedStandards: ["ASTM G48 Crevice Corrosion Standard"],
     relatedCertifications: ["NACE MR0175/ISO 15156"],
-    supportingEvidence: [
-      "Chloride-induced corrosion crevice analysis",
-      "Salt Spray Lab Test #9822",
-    ],
-    contradictions: ["Titanium reported as corrosion-free but fractured under tension"],
-    missingEvidence: ["Crevice oxygenation study"],
+    confidence: 0.95,
+    tags: ["material", "corrosion", "fracture", "saltwater"],
   },
   {
     id: "prec-3",
     title: "Composite Fuel Tank Micro-Cracking under Cryogenic Cycling",
-    summary: "Liquid hydrogen fuel leakage under cyclic cryogenic thermal loads.",
+    summary:
+      "Leakage of liquid hydrogen fuel during multiple fueling thermal load simulation cycles.",
     engineeringQuestion:
-      "How do composite carbon matrices perform under cryogenic cycling without elastomeric liners?",
+      "Do carbon fiber fuel tank matrices maintain structural barrier properties at -183°C under cyclic loads?",
     decisionMade:
-      "Incorporate an inner elastomeric membrane liner and cure with pre-impregnated cyanate ester resins showing lower micro-crack sensitivity.",
-    outcome: "Fuel containment verified through 100 thermal load cycles with zero leakage.",
+      "Integrated inner elastomeric membrane liner and upgraded resin to cyanate ester matrix.",
+    supportingEvidence: ["Thermal Vacuum Deflection Analysis #V12"],
+    contradictions: ["Coefficient of thermal expansion mismatch warnings"],
+    missingEvidence: ["Cryogenic Permeability Test Log"],
+    outcome: "Upgraded tanks completed 100 cryogenic load cycles with zero leakage.",
     lessonsLearned:
-      "Carbon-fiber weave thermal expansion mismatch with epoxy matrix induces matrix micro-cracking at liquid hydrogen temperature.",
-    confidence: 0.9,
-    tags: ["composites", "cryo", "propulsion", "leakage"],
-    relatedProjects: ["Liquid Hydrogen Tanker"],
-    relatedSuppliers: ["Supplier X"],
-    relatedRequirements: ["Requirement 3.5: Cryogenic Tank Integrity"],
+      "Thermal expansion coefficient mismatch between carbon fiber weave and the epoxy resin matrix cures matrix micro-cracking.",
+    relatedProjects: ["Apollo Propulsion Rev C"],
+    relatedSuppliers: ["Composite Tech Inc"],
+    relatedRequirements: ["REQ-PROP-2.4 Cryo Containment"],
     relatedDocuments: ["Cryogenic Structural Integrity Review"],
     relatedComponents: ["Propulsion", "Fuel System", "Composite Materials"],
     relatedStandards: ["ISO 11114 Transportable Gas Cylinders"],
-    relatedCertifications: ["ASME Section VIII Div 3"],
-    supportingEvidence: [
-      "Matrix thermal expansion mismatch testing",
-      "Thermal Vacuum Deflection Analysis #V12",
-    ],
-    contradictions: ["Fiber orientation met stress targets but failed leak checks"],
-    missingEvidence: ["Micro-crack dye penetrant tests"],
+    relatedCertifications: [],
+    confidence: 0.9,
+    tags: ["cryo", "composite", "fuel-tank", "thermal"],
   },
   {
     id: "prec-4",
@@ -93,27 +94,28 @@ const SEED_PRECEDENTS = [
     summary:
       "A highly resilient control system surface actuation design utilizing decoupled split hydraulics and electrical control paths.",
     engineeringQuestion:
-      "What configuration guarantees flight control surface deflection under multiple line losses?",
+      "Does split hydraulic feedback ensure fly-by-wire flight control survival under double structural losses?",
     decisionMade:
-      "Decouple split hydraulics and enforce double-redundant electrical controls in different spatial paths.",
-    outcome:
-      "System verified to survive double hydraulic line losses and triple computer restarts.",
-    lessonsLearned: "Decoupled redundancy avoids common-mode failures across control channels.",
-    confidence: 0.98,
-    tags: ["redundancy", "hydraulics", "controls", "success"],
-    relatedProjects: ["Fly-by-Wire Flight Baseline"],
-    relatedSuppliers: ["Control Logic Corp"],
-    relatedRequirements: ["Requirement 2.1: Surface Control Decoupling"],
-    relatedDocuments: ["Aviation Flight System Integration Manual"],
-    relatedComponents: ["Flight Controls", "Hydraulics"],
-    relatedStandards: ["MIL-H-5440 Hydraulic System Design Standard"],
-    relatedCertifications: ["FAA Part 25 Airworthiness Certification"],
+      "Designed independent hydraulic channels with decoupled split-loop control paths and mechanical firewalls.",
     supportingEvidence: [
       "Failure Mode Effects Analysis (FMEA) Report #8",
-      "Flight computer switch loops",
+      "Decoupled Actuator Run Logs",
     ],
     contradictions: [],
     missingEvidence: [],
+    outcome:
+      "System qualified through structural impact tests, surviving triple electrical failures.",
+    lessonsLearned:
+      "Decoupling feedback control lines keeps hydraulic systems operational under physical component loss.",
+    relatedProjects: ["Aviation Flight System Integration"],
+    relatedSuppliers: ["FlyByWire Systems"],
+    relatedRequirements: ["REQ-FBW-9.1 Double Redundancy"],
+    relatedDocuments: ["Aviation Flight System Integration Manual"],
+    relatedComponents: ["Flight Controls", "Hydraulics"],
+    relatedStandards: ["MIL-H-5440 Hydraulic System Design Standard"],
+    relatedCertifications: ["FAA Part 25 Certification"],
+    confidence: 0.98,
+    tags: ["redundancy", "hydraulics", "controls", "safety"],
   },
   {
     id: "prec-5",
@@ -121,25 +123,24 @@ const SEED_PRECEDENTS = [
     summary:
       "Standardized environmental testing criteria to qualify engineering models against mission profiles.",
     engineeringQuestion:
-      "What test parameters qualify structural assemblies for multi-axis vibration stresses?",
+      "Do standard laboratory room vibration profiles satisfy launch environment qualifications?",
     decisionMade:
-      "Mandate structural model verification against MIL-STD-810H vibration and thermal profiles.",
+      "Mandated multi-axis launch vibration profile tests according to MIL-STD-810H standard.",
+    supportingEvidence: ["Environmental Lab Vibration Test #776", "Launch Acceleration Profiles"],
+    contradictions: [],
+    missingEvidence: ["Thermal Cycling Test Report"],
     outcome:
-      "Qualifying testing standards established and integrated into baseline verification workflow.",
-    lessonsLearned:
-      "Laboratory testing profiles must be derived from actual measured telemetry profiles.",
-    confidence: 1.0,
-    tags: ["testing", "vibration", "standards", "compliance"],
-    relatedProjects: ["Launch Vehicle Vibration Baseline"],
-    relatedSuppliers: ["Supplier X"],
-    relatedRequirements: ["Requirement 5.1: Vibro-Acoustic Qualifications"],
+      "Qualification testing successfully flagged structural weld fractures prior to assembly.",
+    lessonsLearned: "Static room vibration testing misses high-acceleration multi-axis resonances.",
+    relatedProjects: ["Qual-Test 2025"],
+    relatedSuppliers: ["Aᴷ Qualification Labs"],
+    relatedRequirements: ["REQ-ENV-810 Vibration Limits"],
     relatedDocuments: ["MIL-STD-810H Official Handbook"],
     relatedComponents: ["Testing & Verification", "Structure"],
-    relatedStandards: ["Department of Defense Test Method Standard"],
-    relatedCertifications: ["ISO/IEC 17025 Laboratory Accreditation"],
-    supportingEvidence: ["Launch telemetry profile validation logs"],
-    contradictions: [],
-    missingEvidence: [],
+    relatedStandards: ["MIL-STD-810H", "Department of Defense Test Method Standard"],
+    relatedCertifications: ["Environmental Quality Seal"],
+    confidence: 1.0,
+    tags: ["testing", "vibration", "standards", "qualification"],
   },
   {
     id: "prec-6",
@@ -147,46 +148,35 @@ const SEED_PRECEDENTS = [
     summary:
       "A lot of structural shear bolts exhibited tensile failure below the 120 ksi specification constraint during intake lot checks.",
     engineeringQuestion:
-      "Why did fastener lot #9822 fail yield strength check despite mill certificates?",
+      "Can incoming supplier shear bolts be approved without local metallurgical batch tests?",
     decisionMade:
-      "Fastener lot rejected. Alpha Bolt placed on active inspection probation. Imposed 100% hardness inspection checks.",
+      "Imposed 100% receiving-inspection hardness lot tests and placed supplier on active inspection probation.",
+    supportingEvidence: ["Metallurgical Analysis Report #M-0442", "Intake Hardness Logs"],
+    contradictions: ["Alpha Bolt certificate of conformity values vs. local tensile testing"],
+    missingEvidence: [],
     outcome:
-      "Yield strength discrepancies resolved; subsequent lot shipments verified at 122+ ksi.",
+      "Reconciliation of shear bolt batches resulted in supplier replacing the entire lot #9822.",
     lessonsLearned:
-      "Quench-hardening thermal cycles must be verified with sample metallurgical lot testing.",
-    confidence: 0.88,
-    tags: ["fasteners", "supplier-failure", "tensile-test", "quality-control"],
-    relatedProjects: ["Lot Acceptability Baseline"],
+      "Inadequate cooling rate matching during quench-hardening cycles creates micro-voids in fastener ferrite layers.",
+    relatedProjects: ["Structural Intake Inspection"],
     relatedSuppliers: ["Alpha Bolt"],
-    relatedRequirements: ["Requirement 6.1: Fastener Yield Strength"],
+    relatedRequirements: ["REQ-STR-1.2 Fastener Tensile"],
     relatedDocuments: ["Receiving Quality Report for Lot #9822"],
     relatedComponents: ["Structural Fasteners", "Fasteners", "Supply Chain"],
     relatedStandards: ["ISO 898 Fasteners Mechanical Properties"],
-    relatedCertifications: ["ISO 9001 Supplier Audit"],
-    supportingEvidence: [
-      "Metallurgical Analysis Report #M-0442",
-      "Yield strength tensile test failures",
-    ],
-    contradictions: ["Mill certification claimed 125 ksi but sample failed at 112 ksi"],
-    missingEvidence: ["Quench furnace temperature logging chart"],
+    relatedCertifications: ["Alpha Bolt Certificate of Conformity"],
+    confidence: 0.88,
+    tags: ["supplier", "failure", "metallurgy", "fasteners"],
   },
 ];
 
-function parseJsonArray(val: unknown): any[] {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  try {
-    const parsed = typeof val === "string" ? JSON.parse(val) : val;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Self-healing seeder that boots historical knowledge straight into the relational HistoricalPrecedent table
+ * Self-healing seeder for historical precedents in the database
  */
-export async function ensurePrecedentsSeeded(organizationId: string, userId?: string) {
+export async function ensurePrecedentsSeeded(
+  organizationId: string,
+  userId?: string,
+): Promise<void> {
   try {
     let creatorId = userId || null;
     if (!creatorId) {
@@ -196,7 +186,7 @@ export async function ensurePrecedentsSeeded(organizationId: string, userId?: st
       creatorId = firstUser?.id || null;
     }
 
-    for (const p of SEED_PRECEDENTS) {
+    for (const p of INITIAL_PRECEDENTS) {
       const existing = await prisma.historicalPrecedent.findFirst({
         where: { organizationId, id: p.id },
       });
@@ -210,34 +200,33 @@ export async function ensurePrecedentsSeeded(organizationId: string, userId?: st
             summary: p.summary,
             engineeringQuestion: p.engineeringQuestion,
             decisionMade: p.decisionMade,
+            supportingEvidence: p.supportingEvidence as any,
+            contradictions: p.contradictions as any,
+            missingEvidence: p.missingEvidence as any,
             outcome: p.outcome,
             lessonsLearned: p.lessonsLearned,
+            relatedProjects: p.relatedProjects as any,
+            relatedSuppliers: p.relatedSuppliers as any,
+            relatedRequirements: p.relatedRequirements as any,
+            relatedDocuments: p.relatedDocuments as any,
+            relatedComponents: p.relatedComponents as any,
+            relatedStandards: p.relatedStandards as any,
+            relatedCertifications: p.relatedCertifications as any,
             confidence: p.confidence,
-            tags: p.tags,
-            relatedProjects: p.relatedProjects,
-            relatedSuppliers: p.relatedSuppliers,
-            relatedRequirements: p.relatedRequirements,
-            relatedDocuments: p.relatedDocuments,
-            relatedComponents: p.relatedComponents,
-            relatedStandards: p.relatedStandards,
-            relatedCertifications: p.relatedCertifications,
-            supportingEvidence: p.supportingEvidence,
-            contradictions: p.contradictions,
-            missingEvidence: p.missingEvidence,
-            decisionDate: new Date(),
+            tags: p.tags as any,
             decisionOwnerId: creatorId,
             auditMetadata: [
               {
-                action: "SEED",
-                performedBy: creatorId,
+                action: "INITIAL_SEED",
+                performedBy: "Precedent Seeding Engine",
                 timestamp: new Date().toISOString(),
-                details: "Initial seeding of historical precedent memory.",
+                details: { source: "Ariane/Titan/Cryo historical archives" },
               },
-            ],
+            ] as any,
           },
         });
 
-        // Add version log
+        // Version History creation
         await prisma.historicalPrecedentVersion.create({
           data: {
             precedentId: precedent.id,
@@ -247,105 +236,185 @@ export async function ensurePrecedentsSeeded(organizationId: string, userId?: st
             decisionMade: precedent.decisionMade,
             outcome: precedent.outcome,
             lessonsLearned: precedent.lessonsLearned,
-            snapshot: precedent as unknown as Prisma.InputJsonValue,
-            changeDescription: "Initial record seeding",
+            snapshot: precedent as any,
+            changeDescription: "Initial seed data load",
             createdById: creatorId,
           },
         });
       }
     }
-    logger.info("Historical Precedents seeded successfully", { organizationId });
+    logger.info("Historical Precedent Seeding Completed", { organizationId });
   } catch (err) {
     logger.error("Failed to seed historical precedents", { organizationId, err });
   }
 }
 
 /**
- * Maps DB model to the UI-facing EngineeringPrecedent type
+ * Maps the database model to user-facing EngineeringPrecedent type
  */
-async function mapPrecedentToDto(entity: any): Promise<EngineeringPrecedent> {
-  let ownerName = "System";
-  if (entity.decisionOwner) {
-    ownerName = entity.decisionOwner.name || entity.decisionOwner.email;
+function mapToEngineeringPrecedent(dbPrecedent: any): EngineeringPrecedent {
+  const versions = dbPrecedent.versions
+    ? dbPrecedent.versions.map((v: any) => ({
+        id: v.id,
+        version: v.version,
+        title: v.title,
+        summary: v.summary,
+        decisionMade: v.decisionMade,
+        outcome: v.outcome,
+        lessonsLearned: v.lessonsLearned,
+        createdAt: v.createdAt.toISOString(),
+        changeDescription: v.changeDescription,
+        createdById: v.createdById,
+      }))
+    : [];
+
+  const relatedComponents = (dbPrecedent.relatedComponents as string[]) || [];
+  const relatedSuppliers = (dbPrecedent.relatedSuppliers as string[]) || [];
+  const relatedStandards = (dbPrecedent.relatedStandards as string[]) || [];
+  const relatedRequirements = (dbPrecedent.relatedRequirements as string[]) || [];
+  const relatedCertifications = (dbPrecedent.relatedCertifications as string[]) || [];
+  const relatedDocuments = (dbPrecedent.relatedDocuments as string[]) || [];
+  const supportingEvidence = (dbPrecedent.supportingEvidence as string[]) || [];
+  const contradictions = (dbPrecedent.contradictions as string[]) || [];
+  const tags = (dbPrecedent.tags as string[]) || [];
+  const auditMetadata =
+    (dbPrecedent.auditMetadata as unknown as HistoricalPrecedentAuditLog[]) || [];
+
+  // Determine Legacy Precedent Type
+  let type: PrecedentType = "FAILURE";
+  if (
+    tags.includes("successful-design") ||
+    tags.includes("success") ||
+    dbPrecedent.title.toLowerCase().includes("redundant")
+  ) {
+    type = "SUCCESSFUL_DESIGN";
+  } else if (
+    tags.includes("testing") ||
+    tags.includes("standards") ||
+    dbPrecedent.title.toLowerCase().includes("std")
+  ) {
+    type = "REGULATORY_PRECEDENT";
+  } else if (tags.includes("supplier") || relatedSuppliers.length > 0) {
+    type = "SUPPLIER_HISTORY";
   }
 
-  const versionHistory = (entity.versions || []).map((v: any) => ({
+  // Linked entities resolver for legacy components
+  const linkedEntities = [
+    ...relatedComponents.map((c, i) => ({
+      id: `comp-${i}`,
+      name: c,
+      type: "COMPONENT",
+      identifier: `COMP-${c.toUpperCase()}`,
+    })),
+    ...relatedSuppliers.map((s, i) => ({
+      id: `supp-${i}`,
+      name: s,
+      type: "SUPPLIER",
+      identifier: `SUPP-${s.toUpperCase()}`,
+    })),
+  ];
+
+  // Re-map versionHistory & auditTrail in legacy formats
+  const versionHistory = versions.map((v: any) => ({
     id: v.id,
     version: `${v.version}.0.0`,
-    description: v.changeDescription || "Update logged",
-    createdAt: v.createdAt.toISOString(),
+    description: v.changeDescription || "Modified",
+    createdAt: v.createdAt,
   }));
 
-  const auditMetadata = parseJsonArray(entity.auditMetadata);
-  const auditTrail = auditMetadata.map((a: any, idx: number) => ({
-    id: `audit-${idx}`,
-    action: a.action || "UPDATE",
-    metadata: a,
-    createdAt: a.timestamp || entity.createdAt.toISOString(),
+  const auditTrail = auditMetadata.map((a, i) => ({
+    id: `audit-${i}`,
+    action: a.action,
+    metadata: a.details || {},
+    createdAt: a.timestamp,
   }));
-
-  // Map database tags
-  const tags = parseJsonArray(entity.tags);
-  const relatedProjects = parseJsonArray(entity.relatedProjects);
-  const relatedSuppliers = parseJsonArray(entity.relatedSuppliers);
-  const relatedRequirements = parseJsonArray(entity.relatedRequirements);
-  const relatedDocuments = parseJsonArray(entity.relatedDocuments);
-  const relatedComponents = parseJsonArray(entity.relatedComponents);
-  const relatedStandards = parseJsonArray(entity.relatedStandards);
-  const relatedCertifications = parseJsonArray(entity.relatedCertifications);
 
   return {
-    id: entity.id,
-    organizationId: entity.organizationId,
-    title: entity.title,
-    summary: entity.summary,
-    engineeringQuestion: entity.engineeringQuestion,
-    decisionMade: entity.decisionMade,
-    supportingEvidence: entity.supportingEvidence,
-    contradictions: entity.contradictions,
-    missingEvidence: entity.missingEvidence,
-    outcome: entity.outcome,
-    lessonsLearned: entity.lessonsLearned,
-    relatedProjects,
+    id: dbPrecedent.id,
+    organizationId: dbPrecedent.organizationId,
+    title: dbPrecedent.title,
+    summary: dbPrecedent.summary,
+    engineeringQuestion: dbPrecedent.engineeringQuestion,
+    decisionMade: dbPrecedent.decisionMade,
+    supportingEvidence,
+    contradictions,
+    missingEvidence: (dbPrecedent.missingEvidence as string[]) || [],
+    outcome: dbPrecedent.outcome,
+    lessonsLearned: dbPrecedent.lessonsLearned,
+    relatedProjects: (dbPrecedent.relatedProjects as string[]) || [],
     relatedSuppliers,
     relatedRequirements,
     relatedDocuments,
     relatedComponents,
     relatedStandards,
     relatedCertifications,
-    decisionDate: entity.decisionDate.toISOString(),
-    decisionOwnerId: entity.decisionOwnerId,
-    decisionOwnerName: ownerName,
-    confidence: entity.confidence,
+    decisionDate: dbPrecedent.decisionDate.toISOString(),
+    decisionOwnerId: dbPrecedent.decisionOwnerId,
+    decisionOwner: dbPrecedent.decisionOwner
+      ? {
+          id: dbPrecedent.decisionOwner.id,
+          name: dbPrecedent.decisionOwner.name,
+          email: dbPrecedent.decisionOwner.email,
+        }
+      : null,
+    confidence: dbPrecedent.confidence,
     tags,
-    auditMetadata: entity.auditMetadata,
-    createdAt: entity.createdAt.toISOString(),
-    updatedAt: entity.updatedAt.toISOString(),
-    whyRelevant: entity.whyRelevant || "Matched via general search",
-    similarityScore: entity.similarityScore,
-    similarityExplanation: entity.similarityExplanation,
+    auditMetadata,
+    createdAt: dbPrecedent.createdAt.toISOString(),
+    updatedAt: dbPrecedent.updatedAt.toISOString(),
+    deletedAt: dbPrecedent.deletedAt ? dbPrecedent.deletedAt.toISOString() : null,
+    versions,
+
+    // Legacy Fields mappings
+    type,
+    description: dbPrecedent.summary,
+    rootCause: contradictions.length > 0 ? contradictions.join("; ") : "No failure encountered.",
+    correctiveAction: dbPrecedent.decisionMade,
+    resolutionStatus: dbPrecedent.outcome === "RESOLVED" ? "RESOLVED" : "MITIGATED",
+    confidenceScore: dbPrecedent.confidence,
+    applicableSystems: relatedComponents,
+    evidenceMetadata: {
+      documents: relatedDocuments,
+      standards: relatedStandards,
+      testReports: supportingEvidence,
+    },
+    whyRelevant: "Direct match based on historical system and material baseline.",
+    evidenceStrength: dbPrecedent.confidence,
+    linkedEntities,
+    relatedFailures: type === "FAILURE" ? [dbPrecedent.title] : [],
+    relatedCorrectiveActions: dbPrecedent.decisionMade ? [dbPrecedent.decisionMade] : [],
+    engineeringStandards: relatedStandards,
+    graphRelationshipsTraversed: relatedComponents.map(
+      (c) => `[PRECEDENT: ${dbPrecedent.title}] --APPLIES_TO--> [COMPONENT: ${c}]`,
+    ),
+    rulesEvaluated: ["Standard validation checked"],
+    assumptionsRejected: ["Design margins require verification evidence."],
     versionHistory,
     auditTrail,
   };
 }
 
 /**
- * Returns list of precedents, with optional keyword or field search filters
+ * Returns precedents for the organization based on queries
  */
-export async function getPrecedents(query?: {
-  type?: string;
-  search?: string;
-  system?: string;
-  organizationId?: string;
-}): Promise<EngineeringPrecedent[]> {
-  let orgId = query?.organizationId;
+export async function getPrecedents(query: PrecedentQuery & { organizationId?: string }): Promise<{
+  data: EngineeringPrecedent[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  const orgId = query.organizationId;
   if (!orgId) {
-    const defaultOrg = await prisma.organization.findFirst();
-    orgId = defaultOrg?.id;
+    throw new ValidationError({
+      organizationId: ["Organization ID is required to fetch precedents."],
+    });
   }
-  if (!orgId) return [];
 
-  // Seed check
+  const page = query.page || 1;
+  const pageSize = query.pageSize || 10;
+  const skip = (page - 1) * pageSize;
+
+  // Auto seed default data if DB is empty
   const count = await prisma.historicalPrecedent.count({
     where: { organizationId: orgId, deletedAt: null },
   });
@@ -353,126 +422,195 @@ export async function getPrecedents(query?: {
     await ensurePrecedentsSeeded(orgId);
   }
 
-  // Fetch precedents
-  const precedents = await prisma.historicalPrecedent.findMany({
-    where: { organizationId: orgId, deletedAt: null },
+  // Construct filters
+  const andFilters: Prisma.HistoricalPrecedentWhereInput[] = [
+    { organizationId: orgId, deletedAt: null },
+  ];
+
+  if (query.search) {
+    const term = query.search.toLowerCase();
+    andFilters.push({
+      OR: [
+        { title: { contains: term, mode: "insensitive" } },
+        { summary: { contains: term, mode: "insensitive" } },
+        { engineeringQuestion: { contains: term, mode: "insensitive" } },
+        { decisionMade: { contains: term, mode: "insensitive" } },
+        { outcome: { contains: term, mode: "insensitive" } },
+        { lessonsLearned: { contains: term, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  // Filter inside JSON arrays
+  if (query.supplier) {
+    andFilters.push({
+      relatedSuppliers: {
+        array_contains: query.supplier,
+      },
+    });
+  }
+
+  if (query.requirement) {
+    andFilters.push({
+      relatedRequirements: {
+        array_contains: query.requirement,
+      },
+    });
+  }
+
+  if (query.component) {
+    andFilters.push({
+      relatedComponents: {
+        array_contains: query.component,
+      },
+    });
+  }
+
+  if (query.project) {
+    andFilters.push({
+      relatedProjects: {
+        array_contains: query.project,
+      },
+    });
+  }
+
+  if (query.certification) {
+    andFilters.push({
+      relatedCertifications: {
+        array_contains: query.certification,
+      },
+    });
+  }
+
+  if (query.standard) {
+    andFilters.push({
+      relatedStandards: {
+        array_contains: query.standard,
+      },
+    });
+  }
+
+  if (query.tags) {
+    const tagsArr = query.tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    for (const tag of tagsArr) {
+      andFilters.push({
+        tags: {
+          array_contains: tag,
+        },
+      });
+    }
+  }
+
+  if (query.owner) {
+    andFilters.push({
+      decisionOwner: {
+        OR: [
+          { name: { contains: query.owner, mode: "insensitive" } },
+          { email: { contains: query.owner, mode: "insensitive" } },
+        ],
+      },
+    });
+  }
+
+  if (query.dateFrom) {
+    andFilters.push({
+      decisionDate: { gte: new Date(query.dateFrom) },
+    });
+  }
+
+  if (query.dateTo) {
+    andFilters.push({
+      decisionDate: { lte: new Date(query.dateTo) },
+    });
+  }
+
+  const where: Prisma.HistoricalPrecedentWhereInput = { AND: andFilters };
+
+  // Sorting
+  const sortBy = query.sortBy || "decisionDate";
+  const sortOrder = query.sortOrder || "desc";
+  const orderBy: Prisma.HistoricalPrecedentOrderByWithRelationInput = {};
+  if (
+    sortBy === "title" ||
+    sortBy === "summary" ||
+    sortBy === "decisionDate" ||
+    sortBy === "createdAt"
+  ) {
+    orderBy[sortBy] = sortOrder;
+  } else {
+    orderBy.decisionDate = "desc";
+  }
+
+  // Query matching records
+  const dbRecords = await prisma.historicalPrecedent.findMany({
+    where,
+    orderBy,
     include: {
-      decisionOwner: { select: { id: true, name: true, email: true } },
-      versions: { orderBy: { createdAt: "desc" } },
+      decisionOwner: true,
+      versions: { orderBy: { version: "desc" } },
     },
   });
 
-  const results: EngineeringPrecedent[] = [];
-  for (const p of precedents) {
-    results.push(await mapPrecedentToDto(p));
+  let data = dbRecords.map(mapToEngineeringPrecedent);
+
+  // Filter by legacy system if passed
+  if (query.system && query.system !== "ALL") {
+    const sysLower = query.system.toLowerCase();
+    data = data.filter((p) => p.relatedComponents.some((c) => c.toLowerCase().includes(sysLower)));
   }
 
-  // Filter by system (applicable component)
-  if (query?.system && query.system !== "ALL") {
-    const sys = query.system.toLowerCase();
-    return results.filter(
-      (p) =>
-        p.relatedComponents.some((c) => c.toLowerCase().includes(sys)) ||
-        p.relatedProjects.some((pr) => pr.toLowerCase().includes(sys)),
-    );
+  // Filter by legacy type if passed
+  if (query.type && query.type !== "ALL") {
+    data = data.filter((p) => p.type === query.type);
   }
 
-  // General keyword search
-  if (query?.search) {
-    const searchTerms = query.search.toLowerCase().split(/\s+/).filter(Boolean);
-    const scored = results.map((p) => {
-      let score = 0;
-      const reasons: string[] = [];
+  const total = data.length;
+  const paginatedData = data.slice(skip, skip + pageSize);
 
-      searchTerms.forEach((term) => {
-        if (p.title.toLowerCase().includes(term)) {
-          score += 30;
-          reasons.push(`Title matches "${term}"`);
-        }
-        if (p.summary.toLowerCase().includes(term)) {
-          score += 15;
-          reasons.push(`Summary matches "${term}"`);
-        }
-        if (p.decisionMade.toLowerCase().includes(term)) {
-          score += 10;
-          reasons.push(`Decision matches "${term}"`);
-        }
-        if (p.relatedComponents.some((c) => c.toLowerCase().includes(term))) {
-          score += 25;
-          reasons.push(`Component match: ${term}`);
-        }
-        if (p.relatedSuppliers.some((s) => s.toLowerCase().includes(term))) {
-          score += 25;
-          reasons.push(`Supplier match: ${term}`);
-        }
-        if (p.tags.some((t) => t.toLowerCase().includes(term))) {
-          score += 10;
-          reasons.push(`Tag match: ${term}`);
-        }
-      });
-
-      return {
-        precedent: p,
-        score,
-        explanation: reasons.join("; "),
-      };
-    });
-
-    return scored
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map((item) => {
-        item.precedent.similarityScore = Math.min(100, item.score);
-        item.precedent.similarityExplanation = item.explanation;
-        item.precedent.whyRelevant = item.explanation;
-        return item.precedent;
-      });
-  }
-
-  // Sort by decision date descending
-  return results.sort(
-    (a, b) => new Date(b.decisionDate).getTime() - new Date(a.decisionDate).getTime(),
-  );
+  return {
+    data: paginatedData,
+    total,
+    page,
+    pageSize,
+  };
 }
 
 /**
- * Retrieves a precedent by ID
+ * Returns a precedent by ID
  */
 export async function getPrecedentById(
   id: string,
-  organizationId?: string,
+  organizationId: string,
 ): Promise<EngineeringPrecedent | null> {
-  let orgId = organizationId;
-  if (!orgId) {
-    const defaultOrg = await prisma.organization.findFirst();
-    orgId = defaultOrg?.id;
-  }
-  if (!orgId) return null;
-
-  const record = await prisma.historicalPrecedent.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
+  const dbPrecedent = await prisma.historicalPrecedent.findFirst({
+    where: { id, organizationId, deletedAt: null },
     include: {
-      decisionOwner: { select: { id: true, name: true, email: true } },
-      versions: { orderBy: { createdAt: "desc" } },
+      decisionOwner: true,
+      versions: { orderBy: { version: "desc" } },
     },
   });
 
-  if (!record) return null;
-  return mapPrecedentToDto(record);
+  if (!dbPrecedent) return null;
+  return mapToEngineeringPrecedent(dbPrecedent);
 }
 
 /**
- * Creates a new historical precedent record
+ * Creates a new historical precedent and logs its version
  */
 export async function createPrecedent(input: {
+  organizationId?: string;
   title: string;
   summary: string;
   engineeringQuestion: string;
   decisionMade: string;
+  supportingEvidence: string[];
+  contradictions: string[];
+  missingEvidence: string[];
   outcome: string;
   lessonsLearned: string;
-  confidence?: number;
-  tags?: string[];
   relatedProjects?: string[];
   relatedSuppliers?: string[];
   relatedRequirements?: string[];
@@ -480,19 +618,28 @@ export async function createPrecedent(input: {
   relatedComponents?: string[];
   relatedStandards?: string[];
   relatedCertifications?: string[];
-  supportingEvidence?: any;
-  contradictions?: any;
-  missingEvidence?: any;
-  organizationId?: string;
-  userId?: string;
+  confidence?: number;
+  tags: string[];
+  userId?: string | null;
 }): Promise<EngineeringPrecedent> {
-  let orgId = input.organizationId;
+  const orgId = input.organizationId;
   if (!orgId) {
-    const defaultOrg = await prisma.organization.findFirst();
-    orgId = defaultOrg?.id;
+    throw new ValidationError({
+      organizationId: ["Organization ID is required to create a precedent."],
+    });
   }
-  if (!orgId) {
-    throw new Error("No active organization found.");
+
+  // Avoid exact duplication on Title within the same organization
+  const duplicate = await prisma.historicalPrecedent.findFirst({
+    where: {
+      organizationId: orgId,
+      title: input.title,
+      deletedAt: null,
+    },
+  });
+
+  if (duplicate) {
+    throw new Error(`A historical precedent with the title "${input.title}" already exists.`);
   }
 
   const precedent = await prisma.historicalPrecedent.create({
@@ -502,38 +649,36 @@ export async function createPrecedent(input: {
       summary: input.summary,
       engineeringQuestion: input.engineeringQuestion,
       decisionMade: input.decisionMade,
+      supportingEvidence: input.supportingEvidence as any,
+      contradictions: input.contradictions as any,
+      missingEvidence: input.missingEvidence as any,
       outcome: input.outcome,
       lessonsLearned: input.lessonsLearned,
+      relatedProjects: (input.relatedProjects || []) as any,
+      relatedSuppliers: (input.relatedSuppliers || []) as any,
+      relatedRequirements: (input.relatedRequirements || []) as any,
+      relatedDocuments: (input.relatedDocuments || []) as any,
+      relatedComponents: (input.relatedComponents || []) as any,
+      relatedStandards: (input.relatedStandards || []) as any,
+      relatedCertifications: (input.relatedCertifications || []) as any,
       confidence: input.confidence ?? 1.0,
-      tags: input.tags ?? [],
-      relatedProjects: input.relatedProjects ?? [],
-      relatedSuppliers: input.relatedSuppliers ?? [],
-      relatedRequirements: input.relatedRequirements ?? [],
-      relatedDocuments: input.relatedDocuments ?? [],
-      relatedComponents: input.relatedComponents ?? [],
-      relatedStandards: input.relatedStandards ?? [],
-      relatedCertifications: input.relatedCertifications ?? [],
-      supportingEvidence: input.supportingEvidence ?? [],
-      contradictions: input.contradictions ?? [],
-      missingEvidence: input.missingEvidence ?? [],
-      decisionDate: new Date(),
+      tags: input.tags as any,
       decisionOwnerId: input.userId || null,
       auditMetadata: [
         {
-          action: "CREATE",
-          performedBy: input.userId || "System",
+          action: "CREATED",
+          performedBy: input.userId || "System User",
           timestamp: new Date().toISOString(),
-          details: "Created new engineering precedent.",
+          details: { note: "First sign-off and recording" },
         },
-      ],
+      ] as any,
     },
     include: {
-      decisionOwner: { select: { id: true, name: true, email: true } },
-      versions: true,
+      decisionOwner: true,
     },
   });
 
-  // Create version record
+  // Create first version history
   await prisma.historicalPrecedentVersion.create({
     data: {
       precedentId: precedent.id,
@@ -543,289 +688,394 @@ export async function createPrecedent(input: {
       decisionMade: precedent.decisionMade,
       outcome: precedent.outcome,
       lessonsLearned: precedent.lessonsLearned,
-      snapshot: precedent as unknown as Prisma.InputJsonValue,
-      changeDescription: "Initial creation version",
+      snapshot: precedent as any,
+      changeDescription: "Initial version",
       createdById: input.userId || null,
     },
   });
 
-  return mapPrecedentToDto(precedent);
+  return mapToEngineeringPrecedent(precedent);
 }
 
 /**
- * Updates an existing historical precedent, incrementing its version snapshot
+ * Updates an existing historical precedent, incrementing its version
  */
 export async function updatePrecedent(
   id: string,
+  organizationId: string,
   input: {
     title?: string;
     summary?: string;
+    engineeringQuestion?: string;
     decisionMade?: string;
+    supportingEvidence?: string[];
+    contradictions?: string[];
+    missingEvidence?: string[];
     outcome?: string;
     lessonsLearned?: string;
-    tags?: string[];
-    confidence?: number;
     relatedProjects?: string[];
     relatedSuppliers?: string[];
-    relatedComponents?: string[];
     relatedRequirements?: string[];
     relatedDocuments?: string[];
+    relatedComponents?: string[];
     relatedStandards?: string[];
     relatedCertifications?: string[];
+    confidence?: number;
+    tags?: string[];
     changeDescription?: string;
-    userId?: string;
+    userId?: string | null;
   },
-  organizationId?: string,
 ): Promise<EngineeringPrecedent> {
-  let orgId = organizationId;
-  if (!orgId) {
-    const defaultOrg = await prisma.organization.findFirst();
-    orgId = defaultOrg?.id;
-  }
-  if (!orgId) throw new Error("No active organization found.");
-
   const existing = await prisma.historicalPrecedent.findFirst({
-    where: { id, organizationId: orgId, deletedAt: null },
-    include: { versions: { orderBy: { version: "desc" } } },
-  });
-  if (!existing) throw new Error("Precedent not found.");
-
-  const currentVersion = existing.versions[0]?.version || 1;
-  const nextVersion = currentVersion + 1;
-
-  const updateData: any = {};
-  if (input.title !== undefined) updateData.title = input.title;
-  if (input.summary !== undefined) updateData.summary = input.summary;
-  if (input.decisionMade !== undefined) updateData.decisionMade = input.decisionMade;
-  if (input.outcome !== undefined) updateData.outcome = input.outcome;
-  if (input.lessonsLearned !== undefined) updateData.lessonsLearned = input.lessonsLearned;
-  if (input.tags !== undefined) updateData.tags = input.tags;
-  if (input.confidence !== undefined) updateData.confidence = input.confidence;
-  if (input.relatedProjects !== undefined) updateData.relatedProjects = input.relatedProjects;
-  if (input.relatedSuppliers !== undefined) updateData.relatedSuppliers = input.relatedSuppliers;
-  if (input.relatedComponents !== undefined) updateData.relatedComponents = input.relatedComponents;
-  if (input.relatedRequirements !== undefined)
-    updateData.relatedRequirements = input.relatedRequirements;
-  if (input.relatedDocuments !== undefined) updateData.relatedDocuments = input.relatedDocuments;
-  if (input.relatedStandards !== undefined) updateData.relatedStandards = input.relatedStandards;
-  if (input.relatedCertifications !== undefined)
-    updateData.relatedCertifications = input.relatedCertifications;
-
-  const currentAudit = parseJsonArray(existing.auditMetadata);
-  currentAudit.push({
-    action: "UPDATE",
-    performedBy: input.userId || "System",
-    timestamp: new Date().toISOString(),
-    details: input.changeDescription || `Updated precedent properties (v${nextVersion}).`,
-  });
-  updateData.auditMetadata = currentAudit;
-
-  const updated = await prisma.historicalPrecedent.update({
-    where: { id },
-    data: updateData,
+    where: { id, organizationId, deletedAt: null },
     include: {
-      decisionOwner: { select: { id: true, name: true, email: true } },
-      versions: { orderBy: { createdAt: "desc" } },
+      versions: { orderBy: { version: "desc" }, take: 1 },
     },
   });
 
-  // Record version snapshot
+  if (!existing) {
+    throw new Error(`Precedent not found or unauthorized: ${id}`);
+  }
+
+  const nextVersion = existing.versions.length > 0 ? existing.versions[0].version + 1 : 1;
+
+  // Build new audit logs
+  const auditMetadata = (existing.auditMetadata as unknown as HistoricalPrecedentAuditLog[]) || [];
+  auditMetadata.push({
+    action: "UPDATED",
+    performedBy: input.userId || "System User",
+    timestamp: new Date().toISOString(),
+    details: { version: nextVersion, description: input.changeDescription || "Modified fields" },
+  });
+
+  const updatedPrecedent = await prisma.historicalPrecedent.update({
+    where: { id },
+    data: {
+      title: input.title !== undefined ? input.title : existing.title,
+      summary: input.summary !== undefined ? input.summary : existing.summary,
+      engineeringQuestion:
+        input.engineeringQuestion !== undefined
+          ? input.engineeringQuestion
+          : existing.engineeringQuestion,
+      decisionMade: input.decisionMade !== undefined ? input.decisionMade : existing.decisionMade,
+      supportingEvidence:
+        input.supportingEvidence !== undefined
+          ? (input.supportingEvidence as any)
+          : existing.supportingEvidence,
+      contradictions:
+        input.contradictions !== undefined
+          ? (input.contradictions as any)
+          : existing.contradictions,
+      missingEvidence:
+        input.missingEvidence !== undefined
+          ? (input.missingEvidence as any)
+          : existing.missingEvidence,
+      outcome: input.outcome !== undefined ? input.outcome : existing.outcome,
+      lessonsLearned:
+        input.lessonsLearned !== undefined ? input.lessonsLearned : existing.lessonsLearned,
+      relatedProjects:
+        input.relatedProjects !== undefined
+          ? (input.relatedProjects as any)
+          : existing.relatedProjects,
+      relatedSuppliers:
+        input.relatedSuppliers !== undefined
+          ? (input.relatedSuppliers as any)
+          : existing.relatedSuppliers,
+      relatedRequirements:
+        input.relatedRequirements !== undefined
+          ? (input.relatedRequirements as any)
+          : existing.relatedRequirements,
+      relatedDocuments:
+        input.relatedDocuments !== undefined
+          ? (input.relatedDocuments as any)
+          : existing.relatedDocuments,
+      relatedComponents:
+        input.relatedComponents !== undefined
+          ? (input.relatedComponents as any)
+          : existing.relatedComponents,
+      relatedStandards:
+        input.relatedStandards !== undefined
+          ? (input.relatedStandards as any)
+          : existing.relatedStandards,
+      relatedCertifications:
+        input.relatedCertifications !== undefined
+          ? (input.relatedCertifications as any)
+          : existing.relatedCertifications,
+      confidence: input.confidence !== undefined ? input.confidence : existing.confidence,
+      tags: input.tags !== undefined ? (input.tags as any) : existing.tags,
+      auditMetadata: auditMetadata as any,
+    },
+    include: {
+      decisionOwner: true,
+    },
+  });
+
+  // Log new version history
   await prisma.historicalPrecedentVersion.create({
     data: {
-      precedentId: updated.id,
+      precedentId: updatedPrecedent.id,
       version: nextVersion,
-      title: updated.title,
-      summary: updated.summary,
-      decisionMade: updated.decisionMade,
-      outcome: updated.outcome,
-      lessonsLearned: updated.lessonsLearned,
-      snapshot: updated as unknown as Prisma.InputJsonValue,
-      changeDescription: input.changeDescription || `Version ${nextVersion} update`,
+      title: updatedPrecedent.title,
+      summary: updatedPrecedent.summary,
+      decisionMade: updatedPrecedent.decisionMade,
+      outcome: updatedPrecedent.outcome,
+      lessonsLearned: updatedPrecedent.lessonsLearned,
+      snapshot: updatedPrecedent as any,
+      changeDescription: input.changeDescription || `Updated to version ${nextVersion}`,
       createdById: input.userId || null,
     },
   });
 
-  return mapPrecedentToDto(updated);
+  return mapToEngineeringPrecedent(updatedPrecedent);
 }
 
 /**
- * Soft deletes a precedent record
+ * Soft deletes a precedent
  */
-export async function deletePrecedent(id: string, organizationId: string): Promise<boolean> {
+export async function deletePrecedent(
+  id: string,
+  organizationId: string,
+  userId?: string,
+): Promise<boolean> {
   const existing = await prisma.historicalPrecedent.findFirst({
     where: { id, organizationId, deletedAt: null },
   });
-  if (!existing) return false;
+
+  if (!existing) {
+    throw new Error(`Precedent not found or unauthorized: ${id}`);
+  }
+
+  const auditMetadata = (existing.auditMetadata as unknown as HistoricalPrecedentAuditLog[]) || [];
+  auditMetadata.push({
+    action: "DELETED",
+    performedBy: userId || "System User",
+    timestamp: new Date().toISOString(),
+    details: { reason: "Soft-deleted by user request" },
+  });
 
   await prisma.historicalPrecedent.update({
     where: { id },
-    data: { deletedAt: new Date() },
+    data: {
+      deletedAt: new Date(),
+      auditMetadata: auditMetadata as any,
+    },
   });
+
   return true;
 }
 
 /**
- * Computes deterministic similarity matching of all precedents for a given target entity details
+ * Computes deterministic similarity scores and explanations between an active target and historical precedents
  */
-export async function getPrecedentsSimilarity(
-  targetId: string,
+export async function getPrecedentsBySimilarity(
   organizationId: string,
+  context: {
+    question?: string;
+    componentName?: string;
+    suppliers?: string[];
+    requirements?: string[];
+    standards?: string[];
+    certifications?: string[];
+    documents?: string[];
+    contradictions?: string[];
+    missingEvidence?: string[];
+  },
 ): Promise<EngineeringPrecedent[]> {
-  // Fetch active target
-  const target = await prisma.engineeringEntity.findFirst({
-    where: { id: targetId, organizationId, deletedAt: null },
-    include: {
-      sourceRelationships: {
-        include: { targetEntity: true },
-      },
-      targetRelationships: {
-        include: { sourceEntity: true },
-      },
-    },
-  });
-  if (!target) return [];
+  // Retrieve all precedents
+  const { data: precedents } = await getPrecedents({ organizationId, pageSize: 100 });
 
-  // Extract features from target
-  const componentName = target.name.toLowerCase();
-  const componentCode = target.identifier.toLowerCase();
+  const queryTerms = context.question
+    ? context.question
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((q) => q.length > 2)
+    : [];
 
-  // Find linked requirements, suppliers, standards, and documents
-  const suppliers: string[] = [];
-  const requirements: string[] = [];
-  const standards: string[] = [];
-  const documents: string[] = [];
+  const evaluated = await Promise.all(
+    precedents.map(async (p) => {
+      let score = 0;
+      const explanations: string[] = [];
 
-  const allRelations = [...target.sourceRelationships, ...target.targetRelationships];
-  allRelations.forEach((r) => {
-    const linked =
-      (r as any).sourceEntityId === target.id ? (r as any).targetEntity : (r as any).sourceEntity;
-    const type = linked.entityType.toUpperCase();
-    const nameLower = linked.name.toLowerCase();
+      // Helper to calculate exact/sub-string matches
+      const getIntersection = (arrA: string[], arrB: string[]): string[] => {
+        const normalizedA = arrA.map((a) => a.toLowerCase().trim());
+        const normalizedB = arrB.map((b) => b.toLowerCase().trim());
+        return arrA.filter((_, index) =>
+          normalizedB.some((b) => b.includes(normalizedA[index]) || normalizedA[index].includes(b)),
+        );
+      };
 
-    if (type === "SUPPLIER") {
-      suppliers.push(nameLower);
-    } else if (type === "REQUIREMENT") {
-      requirements.push(nameLower);
-    } else if (type === "STANDARD") {
-      standards.push(nameLower);
-    } else if (
-      type === "DOCUMENT" ||
-      linked.identifier.includes("DOC") ||
-      nameLower.includes("report") ||
-      nameLower.includes("manual")
-    ) {
-      documents.push(nameLower);
-    }
-  });
-
-  // Collect target tags
-  const targetTags = parseJsonArray(target.tags).map((t) => t.toLowerCase());
-
-  // Load all precedents
-  const precedents = await prisma.historicalPrecedent.findMany({
-    where: { organizationId, deletedAt: null },
-    include: {
-      decisionOwner: { select: { id: true, name: true, email: true } },
-      versions: { orderBy: { createdAt: "desc" } },
-    },
-  });
-
-  const scored: { precedent: EngineeringPrecedent; score: number; reasons: string[] }[] = [];
-
-  for (const p of precedents) {
-    let score = 0;
-    const reasons: string[] = [];
-
-    // Parse arrays
-    const pSuppliers = parseJsonArray(p.relatedSuppliers).map((s) => s.toLowerCase());
-    const pComponents = parseJsonArray(p.relatedComponents).map((c) => c.toLowerCase());
-    const pRequirements = parseJsonArray(p.relatedRequirements).map((r) => r.toLowerCase());
-    const pStandards = parseJsonArray(p.relatedStandards).map((s) => s.toLowerCase());
-    const pDocuments = parseJsonArray(p.relatedDocuments).map((d) => d.toLowerCase());
-    const pTags = parseJsonArray(p.tags).map((t) => t.toLowerCase());
-
-    // 1. Check Component Matches
-    const commonComponents = pComponents.filter(
-      (c) => componentName.includes(c) || c.includes(componentName) || componentCode.includes(c),
-    );
-    if (commonComponents.length > 0) {
-      score += 35;
-      reasons.push(`Shared component/subsystem context ("${commonComponents.join(", ")}")`);
-    }
-
-    // 2. Check Supplier Matches
-    const commonSuppliers = pSuppliers.filter((s) =>
-      suppliers.some((ts) => ts.includes(s) || s.includes(ts)),
-    );
-    if (commonSuppliers.length > 0) {
-      score += 25;
-      reasons.push(`Same supplier ("${commonSuppliers.join(", ")}")`);
-    }
-
-    // 3. Check Requirement Matches
-    const commonRequirements = pRequirements.filter((r) =>
-      requirements.some((tr) => tr.includes(r) || r.includes(tr)),
-    );
-    if (commonRequirements.length > 0) {
-      score += 20;
-      reasons.push(`Shared requirement constraints ("${commonRequirements.join(", ")}")`);
-    }
-
-    // 4. Check Standard Matches
-    const commonStandards = pStandards.filter((s) =>
-      standards.some((ts) => ts.includes(s) || s.includes(ts)),
-    );
-    if (commonStandards.length > 0) {
-      score += 20;
-      reasons.push(`Governed by same standard ("${commonStandards.join(", ")}")`);
-    }
-
-    // 5. Check Document Reference Matches
-    const commonDocs = pDocuments.filter((d) =>
-      documents.some((td) => td.includes(d) || d.includes(td)),
-    );
-    if (commonDocs.length > 0) {
-      score += 15;
-      reasons.push(`Common document references ("${commonDocs.join(", ")}")`);
-    }
-
-    // 6. Check Tag/Metadata overlap
-    const commonTags = pTags.filter((t) => targetTags.includes(t));
-    if (commonTags.length > 0) {
-      score += 10;
-      reasons.push(`Shared tag metadata ("${commonTags.join(", ")}")`);
-    }
-
-    // Fallback: If no matches, check general text overlap of title with component name
-    if (score === 0) {
-      const pTitle = p.title.toLowerCase();
-      if (pTitle.includes(componentName) || componentName.includes(pTitle)) {
-        score += 15;
-        reasons.push("General context title match");
+      // 1. Shared Suppliers (Weight: 25)
+      if (context.suppliers && context.suppliers.length > 0) {
+        const overlap = getIntersection(context.suppliers, p.relatedSuppliers);
+        if (overlap.length > 0) {
+          score += 25;
+          explanations.push(`Shared supplier connection: ${overlap.join(", ")}`);
+        }
       }
-    }
 
-    const finalScore = Math.min(100, score);
-    const dto = await mapPrecedentToDto(p);
-    dto.similarityScore = finalScore;
-    dto.similarityExplanation =
-      reasons.length > 0 ? reasons.join("; ") : "Matched via fallback verification scan.";
-    dto.whyRelevant = dto.similarityExplanation;
+      // 2. Shared Components (Weight: 25)
+      if (context.componentName) {
+        const match = p.relatedComponents.some(
+          (c) =>
+            c.toLowerCase().includes(context.componentName!.toLowerCase()) ||
+            context.componentName!.toLowerCase().includes(c.toLowerCase()),
+        );
+        if (match) {
+          score += 25;
+          explanations.push(`Mating system or component matches: "${context.componentName}"`);
+        }
+      }
 
-    scored.push({
-      precedent: dto,
-      score: finalScore,
-      reasons,
-    });
-  }
+      // 3. Shared Standards (Weight: 20)
+      if (context.standards && context.standards.length > 0) {
+        const overlap = getIntersection(context.standards, p.relatedStandards);
+        if (overlap.length > 0) {
+          score += 20;
+          explanations.push(`Governed by same engineering standards: ${overlap.join(", ")}`);
+        }
+      }
 
-  // Sort by similarity score descending, taking only matches with score > 0
-  return scored.sort((a, b) => b.score - a.score).map((item) => item.precedent);
+      // 4. Shared Requirements (Weight: 15)
+      if (context.requirements && context.requirements.length > 0) {
+        const overlap = getIntersection(context.requirements, p.relatedRequirements);
+        if (overlap.length > 0) {
+          score += 15;
+          explanations.push(`Shares regulatory requirements: ${overlap.join(", ")}`);
+        }
+      }
+
+      // 5. Shared Certifications (Weight: 15)
+      if (context.certifications && context.certifications.length > 0) {
+        const overlap = getIntersection(context.certifications, p.relatedCertifications);
+        if (overlap.length > 0) {
+          score += 15;
+          explanations.push(`Shares quality certifications: ${overlap.join(", ")}`);
+        }
+      }
+
+      // 6. Shared Documents (Weight: 10)
+      if (context.documents && context.documents.length > 0) {
+        const overlap = getIntersection(context.documents, p.relatedDocuments);
+        if (overlap.length > 0) {
+          score += 10;
+          explanations.push(`Linked to same document references: ${overlap.join(", ")}`);
+        }
+      }
+
+      // 7. Shared Contradictions (Weight: 15)
+      if (context.contradictions && context.contradictions.length > 0) {
+        const overlap = getIntersection(context.contradictions, p.contradictions);
+        if (overlap.length > 0) {
+          score += 15;
+          explanations.push(`Shares identical contradiction indicators: ${overlap.join(", ")}`);
+        }
+      }
+
+      // 8. Text overlap from question (Weight: 10 per keyword, up to 30)
+      let keywordScore = 0;
+      const matchedTerms: string[] = [];
+      queryTerms.forEach((term) => {
+        if (
+          p.title.toLowerCase().includes(term) ||
+          p.summary.toLowerCase().includes(term) ||
+          p.engineeringQuestion.toLowerCase().includes(term)
+        ) {
+          keywordScore += 10;
+          matchedTerms.push(term);
+        }
+      });
+
+      if (keywordScore > 0) {
+        score += Math.min(keywordScore, 30);
+        explanations.push(`Matches engineering query key terms: "${matchedTerms.join(", ")}"`);
+      }
+
+      // 9. Fetch Quality and Manufacturing Metrics (Penalty/Bonus)
+      let totalNCRs = 0;
+      const totalECOs = 0;
+      let averageScrapRate = 0;
+      let riskLevel: "LOW" | "MEDIUM" | "HIGH" = "LOW";
+
+      if (p.relatedSuppliers && p.relatedSuppliers.length > 0) {
+        // Find suppliers by name
+        const suppliers = await prisma.supplier.findMany({
+          where: { organizationId, name: { in: p.relatedSuppliers } },
+          select: { id: true },
+        });
+        const supplierIds = suppliers.map((s) => s.id);
+
+        if (supplierIds.length > 0) {
+          // Count Quality Events (NCRs)
+          totalNCRs = await prisma.qualityEvent.count({
+            where: { organizationId, supplierId: { in: supplierIds } },
+          });
+
+          // Get Manufacturing Events to calculate scrap rate
+          const mfgEvents = await prisma.manufacturingEvent.findMany({
+            where: { organizationId, supplierId: { in: supplierIds } },
+            select: { quantityProduced: true, quantityScrapped: true },
+          });
+
+          let totalProduced = 0;
+          let totalScrapped = 0;
+          mfgEvents.forEach((e) => {
+            totalProduced += e.quantityProduced;
+            totalScrapped += e.quantityScrapped;
+          });
+
+          if (totalProduced > 0) {
+            averageScrapRate = (totalScrapped / totalProduced) * 100;
+          }
+
+          // Evaluate Risk
+          if (totalNCRs > 5 || averageScrapRate > 10) {
+            riskLevel = "HIGH";
+            score -= 20; // Penalty for high risk suppliers
+            explanations.push(
+              `WARNING: High manufacturing risk detected (${totalNCRs} NCRs, ${averageScrapRate.toFixed(1)}% scrap rate).`,
+            );
+          } else if (totalNCRs > 0 || averageScrapRate > 2) {
+            riskLevel = "MEDIUM";
+            score -= 5;
+            explanations.push(
+              `Note: Moderate manufacturing risk (${totalNCRs} NCRs, ${averageScrapRate.toFixed(1)}% scrap rate).`,
+            );
+          } else {
+            score += 10; // Bonus for proven high-quality suppliers
+            explanations.push(
+              `Bonus: Proven high-quality manufacturing record (0 NCRs, ${averageScrapRate.toFixed(1)}% scrap rate).`,
+            );
+          }
+        }
+      }
+
+      // Normalize final score to max 100
+      const finalScore = Math.max(0, Math.min(score, 100));
+
+      return {
+        ...p,
+        similarityScore: finalScore,
+        matchExplanation:
+          explanations.length > 0
+            ? explanations
+            : ["Matched via general organizational directory scan."],
+        qualityMetrics: {
+          totalNCRs,
+          totalECOs,
+          averageScrapRate,
+          riskLevel,
+        },
+      };
+    }),
+  );
+
+  // Return sorted by score descending, filtering out zero/very low matches if context provided
+  return evaluated
+    .filter((item) => item.similarityScore! > 0)
+    .sort((a, b) => b.similarityScore! - a.similarityScore!);
 }
 
-/**
- * Returns unique systems/components
- */
 export async function getUniqueSystems(organizationId?: string): Promise<string[]> {
   let orgId = organizationId;
   if (!orgId) {
@@ -834,10 +1084,10 @@ export async function getUniqueSystems(organizationId?: string): Promise<string[
   }
   if (!orgId) return [];
 
-  const precedents = await getPrecedents({ organizationId: orgId });
+  const { data: precdents } = await getPrecedents({ organizationId: orgId, pageSize: 100 });
   const systems = new Set<string>();
-  precedents.forEach((p) => {
-    p.relatedComponents.forEach((c) => systems.add(c));
+  precdents.forEach((p) => {
+    p.relatedComponents.forEach((s) => systems.add(s));
   });
   return Array.from(systems).sort();
 }

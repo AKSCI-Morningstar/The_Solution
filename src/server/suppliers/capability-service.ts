@@ -16,6 +16,7 @@ export async function createCapability(
 
   const capability = await prisma.supplierCapability.create({
     data: {
+      organizationId,
       supplierId,
       capabilityType: input.capabilityType,
       capabilityName: input.capabilityName,
@@ -57,7 +58,7 @@ export async function getCapabilities(supplierId: string, organizationId: string
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   return prisma.supplierCapability.findMany({
-    where: { supplierId },
+    where: { supplierId, organizationId },
     orderBy: [{ capabilityType: "asc" }, { capabilityName: "asc" }],
   });
 }
@@ -69,7 +70,7 @@ export async function getCapability(capId: string, supplierId: string, organizat
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const cap = await prisma.supplierCapability.findFirst({
-    where: { id: capId, supplierId },
+    where: { id: capId, supplierId, organizationId },
   });
   if (!cap) throw new NotFoundError("SupplierCapability", capId);
   return cap;
@@ -87,7 +88,7 @@ export async function updateCapability(
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const existing = await prisma.supplierCapability.findFirst({
-    where: { id: capId, supplierId },
+    where: { id: capId, supplierId, organizationId },
   });
   if (!existing) throw new NotFoundError("SupplierCapability", capId);
 
@@ -136,7 +137,7 @@ export async function deleteCapability(capId: string, supplierId: string, organi
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const cap = await prisma.supplierCapability.findFirst({
-    where: { id: capId, supplierId },
+    where: { id: capId, supplierId, organizationId },
   });
   if (!cap) throw new NotFoundError("SupplierCapability", capId);
 
@@ -152,6 +153,7 @@ export async function searchCapabilities(organizationId: string, query: string, 
   return prisma.supplierCapability.findMany({
     where: {
       status: "ACTIVE",
+      organizationId,
       OR: [
         { capabilityName: { contains: query, mode: "insensitive" } },
         { description: { contains: query, mode: "insensitive" } },

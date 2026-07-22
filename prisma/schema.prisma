@@ -53,6 +53,10 @@ model User {
   historicalPrecedents        HistoricalPrecedent[]        @relation("PrecedentOwner")
   historicalPrecedentVersions HistoricalPrecedentVersion[] @relation("VersionCreator")
   decisionsFinalized          Decision[]                   @relation("DecisionFinalizer")
+  drawingProjects             DrawingProject[]
+  uploadedRevisions           DrawingRevision[]
+  proposedDecisions           EngineeringDecision[]        @relation("DecisionProposer")
+  decisionApprovals           DecisionApproval[]
 
   @@index([email])
   @@index([status])
@@ -101,6 +105,33 @@ model Organization {
   supplierRelationships    SupplierRelationship[]
   historicalPrecedents     HistoricalPrecedent[]
   decisions                Decision[]
+  programs                 Program[]
+  drawingDesignPatterns    DrawingDesignPattern[]
+  timestamps               Timestamp[]
+  supplierContacts         SupplierContact[]
+  supplierCertifications   SupplierCertification[]
+  supplierCapabilities     SupplierCapability[]
+  manufacturingEvents      ManufacturingEvent[]
+  qualityEvents            QualityEvent[]
+  engineeringChanges       EngineeringChange[]
+  federatedInsights        FederatedInsight[]
+  generativeVariants       GenerativeVariant[]
+  complianceProofs         ComplianceProof[]
+  spindleTelemetries       SpindleTelemetry[]
+  supplyChainRisks         SupplyChainRisk[]
+  knowledgeAxioms          KnowledgeAxiom[]
+  exportClearances         ExportClearance[]
+  humanRecords             HumanRecord[]
+  proposedLinks            ProposedLink[]
+  attestationRecords       AttestationRecord[]
+  validationMilestones     ValidationMilestone[]
+  conflictLogs             ConflictLog[]
+  worldModelAxioms         WorldModelAxiom[]
+  tribalKnowledgeLogs      TribalKnowledgeLog[]
+  negotiationSessions      NegotiationSession[]
+  causalFlightTwins        CausalFlightTwin[]
+  supplyChainReroutes      SupplyChainReroute[]
+
 
   @@index([slug])
   @@index([ownerId])
@@ -269,6 +300,9 @@ model EngineeringEntity {
   targetRelationships EngineeringRelationship[] @relation("TargetEntity")
   versions            EntityVersion[]
   auditLogs           EntityAuditLog[]
+  manufacturingEvents ManufacturingEvent[]
+  qualityEvents       QualityEvent[]
+  engineeringChanges  EngineeringChange[]
 
   @@unique([organizationId, identifier])
   @@index([organizationId])
@@ -437,15 +471,19 @@ model AuditLog {
 }
 
 model Timestamp {
-  id        String   @id @default(cuid())
-  label     String
-  value     DateTime
-  metadata  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String
+  label          String
+  value          DateTime
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([label])
   @@index([value])
+  @@index([organizationId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1094,6 +1132,9 @@ model Supplier {
   riskNotes          String?
   engineeringNotes   String?
   status             String    @default("ACTIVE")
+  liveCapacityScore  Float     @default(1.0)
+  capabilityTags     Json?
+  rating             Float     @default(5.0)
   metadata           Json?
   tags               Json?
   labels             Json?
@@ -1113,6 +1154,11 @@ model Supplier {
   facilities      SupplierFacility[]
   outgoingRelationships SupplierRelationship[] @relation("SupplierRelSource")
   incomingRelationships SupplierRelationship[] @relation("SupplierRelTarget")
+  manufacturingEvents   ManufacturingEvent[]
+  qualityEvents         QualityEvent[]
+  riskIndicators        SupplierRiskIndicator[]
+  predictedEvents       SupplierPredictedEvent[]
+  engineeringDecisions  EngineeringDecision[]
 
   @@unique([organizationId, identifier])
   @@index([organizationId])
@@ -1123,6 +1169,7 @@ model Supplier {
 
 model SupplierContact {
   id             String   @id @default(cuid())
+  organizationId String
   supplierId     String
   name           String
   title          String?
@@ -1135,14 +1182,17 @@ model SupplierContact {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId])
   @@index([supplierId, isPrimary])
+  @@index([organizationId])
 }
 
 model SupplierCertification {
   id               String    @id @default(cuid())
+  organizationId   String
   supplierId       String
   certificationType String
   certificationName String
@@ -1161,16 +1211,19 @@ model SupplierCertification {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId])
   @@index([supplierId, certificationType])
   @@index([supplierId, status])
   @@index([expiryDate])
+  @@index([organizationId])
 }
 
 model SupplierCapability {
   id               String   @id @default(cuid())
+  organizationId   String
   supplierId       String
   capabilityType   String
   capabilityName   String
@@ -1191,11 +1244,13 @@ model SupplierCapability {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId])
   @@index([supplierId, capabilityType])
   @@index([supplierId, status])
+  @@index([organizationId])
 }
 
 model SupplierFacility {
@@ -1339,3 +1394,633 @@ model Decision {
   @@index([status])
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Manufacturing & Quality
+// ---------------------------------------------------------------------------
+
+model ManufacturingEvent {
+  id              String    @id @default(cuid())
+  organizationId  String
+  entityId        String
+  supplierId      String?
+  eventType       String    @default("PRODUCTION_RUN")
+  quantityProduced Int      @default(0)
+  quantityScrapped Int      @default(0)
+  yieldPercentage Float?
+  costImpact      Float?
+  scheduleImpactDays Int?
+  notes           String?
+  recordedAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entity          EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  supplier        Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([entityId])
+  @@index([supplierId])
+  @@index([eventType])
+}
+
+model QualityEvent {
+  id              String    @id @default(cuid())
+  organizationId  String
+  entityId        String
+  supplierId      String?
+  eventType       String    @default("NCR")
+  severity        String    @default("MINOR")
+  status          String    @default("OPEN")
+  description     String
+  rootCause       String?
+  correctiveAction String?
+  costImpact      Float?
+  recordedAt      DateTime  @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entity          EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  supplier        Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([entityId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model EngineeringChange {
+  id              String    @id @default(cuid())
+  organizationId  String
+  entityId        String
+  changeType      String    @default("ECO")
+  status          String    @default("PROPOSED")
+  title           String
+  description     String
+  rationale       String?
+  costImpact      Float?
+  scheduleImpactDays Int?
+  implementedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entity          EngineeringEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([entityId])
+  @@index([status])
+}
+
+model FederatedInsight {
+  id              String   @id @default(cuid())
+  organizationId  String
+  axiomType       String
+  contextKey      String
+  title           String
+  description     String
+  statisticalData Json
+  recommendation  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([contextKey])
+}
+
+model GenerativeVariant {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  intent              String
+  name                String
+  description         String
+  geometrySpecs       Json
+  predictedCost       Float
+  predictedLeadTime   Int
+  manufacturabilityScore Float
+  confidenceScore     Float
+  matchedSupplierIds  Json
+  rationale           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ComplianceProof {
+  id              String   @id @default(cuid())
+  organizationId  String
+  componentId     String
+  requirementId   String?
+  gcodeHash       String
+  metrologyHash   String
+  proofToken      String   @unique
+  verifiedAt      DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([componentId])
+}
+
+model SpindleTelemetry {
+  id              String   @id @default(cuid())
+  organizationId  String
+  supplierId      String
+  machineId       String
+  spindleSpeedRPM Float
+  feedRateMMPM    Float
+  vibrationG      Float
+  deviationMM     Float
+  isAdjusted      Boolean  @default(false)
+  timestamp       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([supplierId])
+}
+
+model SupplyChainRisk {
+  id              String   @id @default(cuid())
+  organizationId  String
+  programName     String
+  criticalPathRisk Float
+  bottlenecks     Json
+  delayProbability Float
+  simulatedAt     DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model KnowledgeAxiom {
+  id              String   @id @default(cuid())
+  organizationId  String
+  title           String
+  description     String
+  axiomType       String
+  rulesApplied    Json
+  royaltiesEarned Float    @default(0.0)
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ExportClearance {
+  id              String   @id @default(cuid())
+  organizationId  String
+  componentId     String
+  clearanceType   String
+  zkProofStatus   String
+  redactedGeoSpecs Json
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([componentId])
+}
+
+model WorldModelAxiom {
+  id              String   @id @default(cuid())
+  organizationId  String
+  title           String
+  description     String
+  logicPredicate  String
+  confidence      Float
+  verifiedAt      DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model TribalKnowledgeLog {
+  id              String   @id @default(cuid())
+  organizationId  String
+  operatorName    String
+  transcription   String
+  associatedCert  String?
+  gcodeOffset     String
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model NegotiationSession {
+  id              String   @id @default(cuid())
+  organizationId  String
+  componentId     String
+  oemTargetCost   Float
+  supplierPrice   Float
+  negotiatedCost  Float
+  status          String
+  settledAt       DateTime?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model CausalFlightTwin {
+  id              String   @id @default(cuid())
+  organizationId  String
+  componentId     String
+  flightHours     Float
+  metrologyAnomalyMM Float
+  predictedLifeHrs Float
+  updatedAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([componentId])
+}
+
+model SupplyChainReroute {
+  id              String   @id @default(cuid())
+  organizationId  String
+  programName     String
+  disruptedNode   String
+  alternateNode   String
+  gcodeRewritten  Boolean  @default(false)
+  reroutedAt      DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model HumanRecord {
+  id              String   @id @default(cuid())
+  organizationId  String
+  title           String
+  sourceDocument  String
+  sentenceText    String
+  recordType      String
+  authorName      String
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ProposedLink {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  sourceRecordId     String
+  targetRecordId     String
+  proposedReason     String
+  recencyDays        Int
+  similarityScore    Float
+  completenessScore  Float
+  isAttested         Boolean  @default(false)
+  attestedBy         String?
+  attestedAt         DateTime?
+
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model AttestationRecord {
+  id              String   @id @default(cuid())
+  organizationId  String
+  linkId          String
+  engineerName    String
+  notes           String
+  attestedAt      DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ValidationMilestone {
+  id              String   @id @default(cuid())
+  organizationId  String
+  stageName       String
+  status          String
+  precisionPercent Float?
+  startDate       DateTime
+  signOffDate     DateTime?
+  signedOffBy     String?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ConflictLog {
+  id              String   @id @default(cuid())
+  organizationId  String
+  sourceRecordId  String
+  conflictRecordId String
+  description     String
+  resolutionNotes String?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model DrawingProject {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  ownerId       String
+  
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  drawings      Drawing[]
+  comparisons   DrawingComparisonJob[]
+  reports       DrawingReport[]
+
+  @@index([ownerId])
+}
+
+model Drawing {
+  id              String   @id @default(cuid())
+  projectId       String
+  name            String
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         DrawingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions       DrawingRevision[]
+
+  @@index([projectId])
+}
+
+model DrawingRevision {
+  id              String   @id @default(cuid())
+  drawingId       String
+  revisionLabel   String
+  fileUrl         String
+  fileKey         String
+  title           String?
+  drawingNumber   String?
+  material        String?
+  dimensionsJson  String?
+  notesJson       String?
+  revHistoryJson  String?
+  uploadedAt      DateTime @default(now())
+  uploadedById    String
+
+  drawing         Drawing  @relation(fields: [drawingId], references: [id], onDelete: Cascade)
+  uploadedBy      User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  comparisonsAsA  DrawingComparisonJob[] @relation("RevA")
+  comparisonsAsB  DrawingComparisonJob[] @relation("RevB")
+
+  @@index([drawingId])
+  @@index([uploadedById])
+}
+
+model DrawingComparisonJob {
+  id              String   @id @default(cuid())
+  projectId       String
+  revAId          String
+  revBId          String
+  status          String
+  error           String?
+  progress        Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project         DrawingProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revA            DrawingRevision  @relation("RevA", fields: [revAId], references: [id], onDelete: Cascade)
+  revB            DrawingRevision  @relation("RevB", fields: [revBId], references: [id], onDelete: Cascade)
+  changes         DrawingDetectedChange[]
+
+  @@index([projectId])
+  @@index([revAId])
+  @@index([revBId])
+}
+
+model DrawingDetectedChange {
+  id                      String   @id @default(cuid())
+  jobId                   String
+  changeType              String
+  actionType              String
+  category                String
+  description             String
+  oldValue                String?
+  newValue                String?
+  boundingBox             String?
+  manufacturingImpact     String?
+  qualityImpact           String?
+  createdAt               DateTime @default(now())
+
+  job                     DrawingComparisonJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+model DrawingReport {
+  id            String   @id @default(cuid())
+  projectId     String
+  title         String
+  pdfUrl        String?
+  summary       String
+  changesJson   String
+  mfgImpact     String
+  qualityImpact String
+  createdAt     DateTime @default(now())
+
+  project       DrawingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model SupplierRiskIndicator {
+  id                    String      @id @default(cuid())
+  supplierId            String
+  geometryType          String      // "bore", "surface", "thread"
+  onTimeRate            Float
+  leadTimeDeviation     Int
+  scrapRate             Float
+  reworkRate            Float
+  qualityTrend          String      // "improving", "stable", "degrading"
+  predictor             Json?
+  riskLevel             String      // HIGH, MEDIUM, LOW
+  riskReason            String[]
+  historicalMitigation  String[]
+  successRate           Float
+  confidenceScore       Float
+  lastUpdated           DateTime    @updatedAt
+  createdAt             DateTime    @default(now())
+
+  supplier              Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+model SupplierPredictedEvent {
+  id                    String      @id @default(cuid())
+  supplierId            String
+  eventType             String      // "LEAD_TIME_SLIP", "QUALITY_ISSUE", "CAPACITY_CONSTRAINT"
+  probability           Float
+  expectedImpact        String
+  historicalPrecedents  Int
+  timeframe             String
+  mitigationOptions     Json?
+  createdAt             DateTime    @default(now())
+
+  supplier              Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+model EngineeringDecision {
+  id                    String      @id @default(cuid())
+  organizationId        String
+  partId                String?
+  supplierId            String?
+  programId             String?
+  decisionType          String      // TOLERANCE_CHANGE, MATERIAL_SUB, SUPPLIER_CHANGE, PROCESS_CHANGE
+  description           String
+  rationale             String
+  proposedById          String
+  proposedAt            DateTime    @default(now())
+  status                String      // PROPOSED, APPROVED, IMPLEMENTED, COMPLETED, CLOSED
+  outcome               String?     // SUCCESS, PARTIAL_SUCCESS, FAILURE
+  outcomeDetails        String?
+  costImpact            Float?
+  scheduleImpact        Int?
+  yieldImpact           Float?
+  qualityMetrics        Json?
+  lessonsLearned        String?
+  reusableFor           String[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  closedAt              DateTime?
+
+  proposedBy            User               @relation("DecisionProposer", fields: [proposedById], references: [id], onDelete: Cascade)
+  supplier              Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  program               Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
+  approvals             DecisionApproval[]
+  milestones            DecisionMilestone[]
+
+  @@index([organizationId])
+  @@index([proposedById])
+  @@index([supplierId])
+  @@index([programId])
+}
+
+model DecisionApproval {
+  id                    String              @id @default(cuid())
+  decisionId            String
+  approverId            String
+  approvalType          String              // APPROVED, APPROVED_WITH_CONDITIONS, REJECTED, DEFERRED
+  comment               String?
+  conditions            String[]
+  approvedAt            DateTime            @default(now())
+
+  decision              EngineeringDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  approver              User                @relation(fields: [approverId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([approverId])
+}
+
+model DecisionMilestone {
+  id                    String              @id @default(cuid())
+  decisionId            String
+  milestoneType         String              // FIRST_ARTICLE, PRODUCTION, PROGRAM_DELIVERY, FIELD_OPERATION
+  status                String              // PENDING, IN_PROGRESS, COMPLETE, FAILED
+  actualOutcome         String?
+  metrics               Json?
+  completedAt           DateTime?
+  createdAt             DateTime            @default(now())
+
+  decision              EngineeringDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+}
+
+model Program {
+  id                    String              @id @default(cuid())
+  organizationId        String
+  name                  String              // "Boeing 787-MAX"
+  aircraft              String              // "B787", "A350"
+  budgetTarget          Float
+  scheduleTarget        Int                 // days
+  qualityTarget         Float               // acceptable NCR rate
+  currentCost           Float?
+  currentSchedule       Int?
+  currentNCRRate        Float?
+  currentScrapRate      Float?
+  healthScore           Float               @default(100.0)
+  costHealth            Float               @default(100.0)
+  scheduleHealth        Float               @default(100.0)
+  qualityHealth         Float               @default(100.0)
+  riskAlerts            String[]
+  startDate             DateTime            @default(now())
+  targetCompletionDate  DateTime
+  actualCompletionDate  DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  decisions             EngineeringDecision[]
+  predictions           ProgramPrediction[]
+
+  @@index([organizationId])
+}
+
+model ProgramPrediction {
+  id                    String              @id @default(cuid())
+  programId             String
+  predictionType        String              // SCHEDULE_SLIP, COST_OVERRUN, QUALITY_ISSUE
+  probability           Float
+  expectedImpact        String
+  historicalPrecedents  Int
+  timeframe             String
+  recommendedAction     String
+  createdAt             DateTime            @default(now())
+
+  program               Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId])
+}
+
+model DrawingDesignPattern {
+  id                    String              @id @default(cuid())
+  organizationId        String
+  drawingId             String?
+  partType              String
+  material              String
+  geometryClass         String
+  spanDimensions        String?
+  toleranceClass        String?
+  supplierName          String?
+  yieldRate             Float               @default(95.0)
+  costPerPart           Float
+  rating                Float               @default(5.0)
+  lessonsLearned        String
+  relevanceTags         String[]
+  createdAt             DateTime            @default(now())
+
+  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+

@@ -1,66 +1,65 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createDecision, getDecisions } from "@/server/decisions/decision-service";
-import { requireActiveOrganization } from "@/server/organizations/organization-context";
-import { AppError } from "@/shared/errors";
+import { NextResponse } from "next/server";
+import { validateSession } from "@/server/auth/session-service";
+import { getActiveOrganizationId } from "@/server/organizations/organization-context";
+import { getDecisions, createDecision } from "@/server/decisions/decision-service";
 
 export async function GET() {
   try {
-    let organizationId: string | undefined;
-    try {
-      organizationId = await requireActiveOrganization();
-    } catch {
-      // Fallback
+    const session = await validateSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!organizationId) {
-      return NextResponse.json({ error: "Organization context required" }, { status: 400 });
+    const orgId = await getActiveOrganizationId();
+    if (!orgId) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 });
     }
 
-    const data = await getDecisions(organizationId);
-    return NextResponse.json({ data });
-  } catch (err: unknown) {
-    if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
-    }
-    const message = err instanceof Error ? err.message : "Failed to fetch decisions";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const decisions = await getDecisions(orgId);
+    return NextResponse.json({ data: decisions });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
-
-    if (!body.question || !body.question.trim()) {
-      return NextResponse.json(
-        { error: "Question is required to start a decision workflow" },
-        { status: 400 },
-      );
+    const session = await validateSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let organizationId: string | undefined;
-    try {
-      organizationId = await requireActiveOrganization();
-    } catch {
-      // Fallback
+    const orgId = await getActiveOrganizationId();
+    if (!orgId) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 });
     }
 
-    if (!organizationId) {
-      return NextResponse.json({ error: "Organization context required" }, { status: 400 });
+    const body = await request.json();
+    const { decisionType, description, rationale, supplierId, programId, reusableFor } = body;
+
+    if (!decisionType || !description || !rationale) {
+      return NextResponse.json({ error: "Missing required decision fields" }, { status: 400 });
     }
 
-    const newDecision = await createDecision({
-      question: body.question,
-      context: body.context,
-      organizationId,
+    const decision = await createDecision({
+      organizationId: orgId,
+      decisionType,
+      description,
+      rationale,
+      proposedById: session.userId,
+      supplierId,
+      programId,
+      reusableFor,
     });
 
-    return NextResponse.json({ data: newDecision }, { status: 201 });
-  } catch (err: unknown) {
-    if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
-    }
-    const message = err instanceof Error ? err.message : "Failed to create decision";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ data: decision }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 },
+    );
   }
 }

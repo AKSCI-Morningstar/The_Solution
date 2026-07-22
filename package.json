@@ -22,6 +22,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
     "clsx": "^2.1.1",
     "lucide-react": "^1.24.0",
     "mammoth": "^1.12.0",

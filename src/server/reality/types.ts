@@ -51,9 +51,19 @@ export interface RealityPipelineContext {
 
   // Populated by stage 8
   assessment?: RealityAssessmentResult;
+  productionReadiness?: {
+    isReady: boolean;
+    risks: string[];
+    score: number;
+  };
 }
 
 export interface RealityAssessmentResult {
   outcome: RealityOutcome;
   reasoning: string;
+  productionReadiness?: {
+    isReady: boolean;
+    risks: string[];
+    score: number;
+  };
 }

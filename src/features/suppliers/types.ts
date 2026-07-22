@@ -31,6 +31,9 @@ export interface SupplierDTO {
   updatedById?: string | null;
   createdAt: string;
   updatedAt: string;
+  liveCapacityScore?: number;
+  capabilityTags?: string[] | null;
+  rating?: number;
   deletedAt?: string | null;
 
   // Metadata flattened fields

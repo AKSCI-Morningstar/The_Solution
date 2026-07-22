@@ -33,6 +33,13 @@ vi.mock("@/server/precedents/precedent-service", () => {
   };
 });
 
+// Mock the audit service
+vi.mock("@/server/audit/audit-service", () => {
+  return {
+    recordAuditEvent: vi.fn(),
+  };
+});
+
 describe("Decision Service", () => {
   const orgId = "org-123";
   const userId = "user-123";

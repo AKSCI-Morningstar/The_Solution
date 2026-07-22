@@ -1,5 +1,26 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export type PrecedentType =
   "FAILURE" | "SUCCESSFUL_DESIGN" | "REGULATORY_PRECEDENT" | "SUPPLIER_HISTORY";
+
+export interface PrecedentVersionHistory {
+  id: string;
+  version: number;
+  title: string;
+  summary: string;
+  decisionMade: string;
+  outcome: string;
+  lessonsLearned: string;
+  createdAt: string;
+  changeDescription?: string | null;
+  createdById?: string | null;
+}
+
+export interface HistoricalPrecedentAuditLog {
+  action: string;
+  performedBy: string;
+  timestamp: string;
+  details?: Record<string, any>;
+}
 
 export interface EngineeringPrecedent {
   id: string;
@@ -8,9 +29,9 @@ export interface EngineeringPrecedent {
   summary: string;
   engineeringQuestion: string;
   decisionMade: string;
-  supportingEvidence?: unknown;
-  contradictions?: unknown;
-  missingEvidence?: unknown;
+  supportingEvidence: string[]; // List of supporting evidence strings
+  contradictions: string[]; // List of contradictions found
+  missingEvidence: string[]; // List of missing evidence descriptions
   outcome: string;
   lessonsLearned: string;
   relatedProjects: string[];
@@ -22,24 +43,73 @@ export interface EngineeringPrecedent {
   relatedCertifications: string[];
   decisionDate: string;
   decisionOwnerId?: string | null;
-  decisionOwnerName?: string | null;
+  decisionOwner?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
   confidence: number;
   tags: string[];
-  auditMetadata?: unknown;
+  auditMetadata: HistoricalPrecedentAuditLog[];
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  versions?: PrecedentVersionHistory[];
 
-  // Query-time dynamic similarity metrics
-  similarityScore?: number;
-  similarityExplanation?: string;
-  whyRelevant?: string; // For backward compatibility with legacy searches
+  // Dynamic similarity attributes returned by matching engine
+  similarityScore?: number; // 0 to 100
+  matchExplanation?: string[]; // Array of reasons why it matched
+
+  // Quality and Manufacturing metrics
+  qualityMetrics?: {
+    totalNCRs: number;
+    totalECOs: number;
+    averageScrapRate: number;
+    riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  };
+
+  // --- Legacy Compatibility Fields ---
+  type: PrecedentType;
+  description: string;
+  rootCause?: string;
+  correctiveAction?: string;
+  resolutionStatus: string;
+  confidenceScore: number;
+  applicableSystems: string[];
+  evidenceMetadata?: {
+    documents?: string[];
+    standards?: string[];
+    testReports?: string[];
+  };
+  whyRelevant?: string;
+  evidenceStrength?: number;
+  linkedEntities?: { id: string; name: string; type: string; identifier: string }[];
+  relatedFailures?: string[];
+  relatedCorrectiveActions?: string[];
+  engineeringStandards?: string[];
+  graphRelationshipsTraversed?: string[];
+  rulesEvaluated?: string[];
+  assumptionsRejected?: string[];
   versionHistory?: { id: string; version: string; description: string; createdAt: string }[];
   auditTrail?: { id: string; action: string; metadata: unknown; createdAt: string }[];
 }
 
 export interface PrecedentQuery {
-  type?: PrecedentType | "ALL";
   search?: string;
+  type?: string;
   system?: string;
-  organizationId?: string;
+  supplier?: string;
+  requirement?: string;
+  component?: string;
+  project?: string;
+  certification?: string;
+  standard?: string;
+  owner?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  tags?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }

@@ -13,6 +13,8 @@ export const Resources = {
   REALITY: "reality",
   REPORTING: "reporting",
   SUPPLIERS: "suppliers",
+  DECISIONS: "decisions",
+  PRECEDENTS: "precedents",
 } as const;
 
 export const Actions = {
@@ -105,6 +107,20 @@ export const Permissions = {
     delete: "suppliers:delete",
     manage: "suppliers:manage",
   },
+  decisions: {
+    read: "decisions:read",
+    create: "decisions:create",
+    update: "decisions:update",
+    finalize: "decisions:finalize",
+    manage: "decisions:manage",
+  },
+  precedents: {
+    read: "precedents:read",
+    create: "precedents:create",
+    update: "precedents:update",
+    delete: "precedents:delete",
+    manage: "precedents:manage",
+  },
 } as const;
 
 export type PermissionString =
@@ -156,7 +172,17 @@ export type PermissionString =
   | "suppliers:create"
   | "suppliers:update"
   | "suppliers:delete"
-  | "suppliers:manage";
+  | "suppliers:manage"
+  | "decisions:read"
+  | "decisions:create"
+  | "decisions:update"
+  | "decisions:finalize"
+  | "decisions:manage"
+  | "precedents:read"
+  | "precedents:create"
+  | "precedents:update"
+  | "precedents:delete"
+  | "precedents:manage";
 
 export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.organization.read,
@@ -208,6 +234,16 @@ export const ALL_PERMISSIONS: PermissionString[] = [
   Permissions.suppliers.update,
   Permissions.suppliers.delete,
   Permissions.suppliers.manage,
+  Permissions.decisions.read,
+  Permissions.decisions.create,
+  Permissions.decisions.update,
+  Permissions.decisions.finalize,
+  Permissions.decisions.manage,
+  Permissions.precedents.read,
+  Permissions.precedents.create,
+  Permissions.precedents.update,
+  Permissions.precedents.delete,
+  Permissions.precedents.manage,
 ];
 
 export interface RoleDefinition {
@@ -273,6 +309,16 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.suppliers.update,
       Permissions.suppliers.delete,
       Permissions.suppliers.manage,
+      Permissions.decisions.read,
+      Permissions.decisions.create,
+      Permissions.decisions.update,
+      Permissions.decisions.finalize,
+      Permissions.decisions.manage,
+      Permissions.precedents.read,
+      Permissions.precedents.create,
+      Permissions.precedents.update,
+      Permissions.precedents.delete,
+      Permissions.precedents.manage,
       Permissions.reporting.read,
       Permissions.reporting.execute,
       Permissions.reporting.manage,
@@ -297,6 +343,10 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.orchestrator.read,
       Permissions.reality.read,
       Permissions.suppliers.read,
+      Permissions.decisions.read,
+      Permissions.decisions.create,
+      Permissions.decisions.update,
+      Permissions.precedents.read,
       Permissions.reporting.read,
     ],
   },
@@ -333,6 +383,12 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.suppliers.read,
       Permissions.suppliers.create,
       Permissions.suppliers.update,
+      Permissions.decisions.read,
+      Permissions.decisions.create,
+      Permissions.decisions.update,
+      Permissions.precedents.read,
+      Permissions.precedents.create,
+      Permissions.precedents.update,
       Permissions.reporting.read,
       Permissions.reporting.execute,
     ],
@@ -355,6 +411,8 @@ export const DEFAULT_ROLES: RoleDefinition[] = [
       Permissions.orchestrator.read,
       Permissions.reality.read,
       Permissions.suppliers.read,
+      Permissions.decisions.read,
+      Permissions.precedents.read,
       Permissions.reporting.read,
     ],
   },

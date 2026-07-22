@@ -16,6 +16,7 @@ export async function createCertification(
 
   const certification = await prisma.supplierCertification.create({
     data: {
+      organizationId,
       supplierId,
       certificationType: input.certificationType,
       certificationName: input.certificationName,
@@ -53,7 +54,7 @@ export async function getCertifications(supplierId: string, organizationId: stri
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   return prisma.supplierCertification.findMany({
-    where: { supplierId },
+    where: { supplierId, organizationId },
     orderBy: { createdAt: "desc" },
   });
 }
@@ -65,7 +66,7 @@ export async function getCertification(certId: string, supplierId: string, organ
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const cert = await prisma.supplierCertification.findFirst({
-    where: { id: certId, supplierId },
+    where: { id: certId, supplierId, organizationId },
   });
   if (!cert) throw new NotFoundError("SupplierCertification", certId);
   return cert;
@@ -83,7 +84,7 @@ export async function updateCertification(
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const existing = await prisma.supplierCertification.findFirst({
-    where: { id: certId, supplierId },
+    where: { id: certId, supplierId, organizationId },
   });
   if (!existing) throw new NotFoundError("SupplierCertification", certId);
 
@@ -127,7 +128,7 @@ export async function deleteCertification(
   if (!supplier) throw new NotFoundError("Supplier", supplierId);
 
   const cert = await prisma.supplierCertification.findFirst({
-    where: { id: certId, supplierId },
+    where: { id: certId, supplierId, organizationId },
   });
   if (!cert) throw new NotFoundError("SupplierCertification", certId);
 
@@ -147,6 +148,7 @@ export async function getExpiringCertifications(organizationId: string, withinDa
     where: {
       status: "ACTIVE",
       expiryDate: { lte: threshold },
+      organizationId,
       supplier: { organizationId, deletedAt: null },
     },
     include: {

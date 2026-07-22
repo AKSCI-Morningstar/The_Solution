@@ -1,6 +1,7 @@
 import type { WorkflowStage } from "@/server/orchestrator";
 import type { RealityAssessmentResult, RealityPipelineContext } from "../../types";
 import type { RealityOutcome } from "../../constants";
+import { prisma } from "@/server/db";
 
 /**
  * Stage 8 - pure derivation, no I/O. Fixed precedence:
@@ -58,15 +59,88 @@ export function deriveRealityAssessment(ctx: RealityPipelineContext): RealityAss
       "All rules passed, no contradictions are open, ingestion is complete, and no conflicting evidence was recorded.";
   }
 
-  return { outcome, reasoning };
+  // Modify outcome based on production readiness if requested
+  if (ctx.productionReadiness) {
+    if (!ctx.productionReadiness.isReady && outcome === "VERIFIED") {
+      outcome = "CONDITIONALLY_VERIFIED";
+      reasoning += ` However, production readiness is at risk: ${ctx.productionReadiness.risks.join("; ")}`;
+    } else if (!ctx.productionReadiness.isReady) {
+      reasoning += ` Additionally, production readiness is at risk: ${ctx.productionReadiness.risks.join("; ")}`;
+    }
+  }
+
+  return { outcome, reasoning, productionReadiness: ctx.productionReadiness };
 }
 
 export const produceRealityAssessmentStage: WorkflowStage<RealityPipelineContext> = {
   name: "PRODUCE_REALITY_ASSESSMENT",
   execute: async (ctx) => {
+    // Assess Production Readiness
+    let isReady = true;
+    const risks: string[] = [];
+    let prScore = 100;
+
+    try {
+      if (ctx.entitiesEvaluated && ctx.entitiesEvaluated.length > 0) {
+        // Look up any active NCRs for the suppliers attached to these entities
+        // In AKSCI, EngineeringEntities relate to Suppliers via ManufacturingEvents or SupplierRelationships
+        // For simplicity, we just check manufacturing events and quality events for the specific entities
+        const ncrCount = await prisma.qualityEvent.count({
+          where: {
+            organizationId: ctx.organizationId,
+            entityId: { in: ctx.entitiesEvaluated },
+            status: "OPEN",
+          },
+        });
+
+        if (ncrCount > 0) {
+          isReady = false;
+          risks.push(
+            `${ncrCount} open Non-Conformance Reports (NCRs) found for evaluated components`,
+          );
+          prScore -= ncrCount * 15;
+        }
+
+        const mfgEvents = await prisma.manufacturingEvent.findMany({
+          where: {
+            organizationId: ctx.organizationId,
+            entityId: { in: ctx.entitiesEvaluated },
+          },
+          select: { quantityProduced: true, quantityScrapped: true },
+        });
+
+        let totalProduced = 0;
+        let totalScrapped = 0;
+        mfgEvents.forEach((e) => {
+          totalProduced += e.quantityProduced;
+          totalScrapped += e.quantityScrapped;
+        });
+
+        if (totalProduced > 0) {
+          const scrapRate = (totalScrapped / totalProduced) * 100;
+          if (scrapRate > 10) {
+            isReady = false;
+            risks.push(`High historical scrap rate (${scrapRate.toFixed(1)}%) detected`);
+            prScore -= 30;
+          }
+        }
+      }
+    } catch {
+      // Ignore errors for this optional check
+    }
+
+    ctx.productionReadiness = {
+      isReady,
+      risks,
+      score: Math.max(0, prScore),
+    };
+
     const assessment = deriveRealityAssessment(ctx);
     return {
-      patch: { assessment },
+      patch: {
+        assessment,
+        productionReadiness: ctx.productionReadiness,
+      },
       output: { outcome: assessment.outcome },
     };
   },
