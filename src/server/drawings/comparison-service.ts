@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/server/db";
 import { parseDrawingPdf } from "./pdf-parser";
 import { uploadDrawingFile } from "./storage";
@@ -15,7 +16,15 @@ export async function processDrawingUpload(
   const { fileUrl, fileKey } = await uploadDrawingFile(fileName, fileBuffer);
 
   // 2. Extract information from file (PDF OCR or CSV/Spreadsheet parser)
-  let parseResult;
+  let parseResult: {
+    title: string;
+    drawingNumber: string;
+    material: string;
+    dimensions: string[];
+    notes: string[];
+    revHistory: string[];
+  };
+
   const isExcelOrCsv =
     fileName.endsWith(".csv") ||
     fileName.endsWith(".tsv") ||
@@ -24,9 +33,35 @@ export async function processDrawingUpload(
 
   if (isExcelOrCsv) {
     const spreadsheet = await parseBinarySpreadsheet(fileBuffer, fileName);
-    const dimensions = spreadsheet.columns.map(
-      (col) => `${col}: ${spreadsheet.rows[0]?.[col] || ""}`,
-    );
+    const dimensions: string[] = [];
+
+    // Parse ALL rows and ALL columns into dimensions array
+    spreadsheet.rows.forEach((row, rowIndex) => {
+      const rowId =
+        row["Part Number"] ||
+        row["PartNo"] ||
+        row["Feature"] ||
+        row["Dimension"] ||
+        row["Parameter"] ||
+        row["ID"] ||
+        row["Item"] ||
+        `Row ${rowIndex + 1}`;
+
+      Object.entries(row).forEach(([col, val]) => {
+        if (val && val.trim()) {
+          dimensions.push(`${rowId} -> ${col}: ${val.trim()}`);
+        }
+      });
+    });
+
+    const notes = spreadsheet.rows.map((r, i) => {
+      const line = Object.entries(r)
+        .map(([k, v]) => `${k}=${v}`)
+        .filter((s) => s.length > 0)
+        .join(", ");
+      return `${i + 1}. ${line}`;
+    });
+
     parseResult = {
       title: fileName.replace(/\.[^/.]+$/, ""),
       drawingNumber: `DWG-${fileName.slice(0, 8).toUpperCase()}`,
@@ -34,22 +69,30 @@ export async function processDrawingUpload(
         spreadsheet.rows[0]?.["Material"] ||
         spreadsheet.rows[0]?.["material"] ||
         "Specified via CSV",
-      dimensions: dimensions,
-      notes: spreadsheet.rows
-        .map((r, i) => `${i + 1}. ${Object.values(r).join(" | ")}`)
-        .slice(0, 10),
-      revHistory: [`Ingested from ${fileName} with ${spreadsheet.totalRows} rows`],
+      dimensions: dimensions.length > 0 ? dimensions : spreadsheet.columns,
+      notes: notes,
+      revHistory: [
+        `Ingested from ${fileName} (${spreadsheet.totalRows} rows, ${spreadsheet.columns.length} columns)`,
+      ],
     };
   } else {
     try {
-      parseResult = await parseDrawingPdf(fileBuffer);
+      const pdfData = await parseDrawingPdf(fileBuffer);
+      parseResult = {
+        title: pdfData.title || fileName.replace(/\.[^/.]+$/, ""),
+        drawingNumber: pdfData.drawingNumber || `DWG-${fileName.slice(0, 8).toUpperCase()}`,
+        material: pdfData.material || "Not specified",
+        dimensions: pdfData.dimensions,
+        notes: pdfData.notes,
+        revHistory: pdfData.revHistory,
+      };
     } catch (err) {
       console.warn("PDF Parsing fallback to spreadsheet parser:", err);
       const spreadsheet = await parseBinarySpreadsheet(fileBuffer, fileName);
       parseResult = {
         title: fileName.replace(/\.[^/.]+$/, ""),
         drawingNumber: `DWG-${fileName.slice(0, 8).toUpperCase()}`,
-        material: "Specified via CSV",
+        material: "Specified via Document",
         dimensions: spreadsheet.columns,
         notes: spreadsheet.rows
           .map((r, i) => `${i + 1}. ${Object.values(r).join(" | ")}`)
@@ -117,113 +160,119 @@ export async function runDrawingComparison(projectId: string, revAId: string, re
       qualityImpact?: string;
     }> = [];
 
-    // Compare Dimensions
-    // Check for removed dimensions
-    for (const d of dimsA) {
-      if (!dimsB.includes(d)) {
-        // Try to find if it was modified (e.g. same base dimension but different tolerance)
-        const baseA = d.split("±")[0].trim();
-        const matchB = dimsB.find((db) => db.split("±")[0].trim() === baseA);
+    // Helper to extract comparison key for any entry string
+    function getKey(str: string): string {
+      if (str.includes("->")) return str.split(":")[0].trim();
+      if (str.includes(":")) return str.split(":")[0].trim();
+      if (str.includes("±")) return str.split("±")[0].trim();
+      if (str.includes("=")) return str.split("=")[0].trim();
+      return str.trim();
+    }
+
+    // 1. Compare Dimensions / Parameters / Fields
+    for (const dA of dimsA) {
+      if (!dimsB.includes(dA)) {
+        const keyA = getKey(dA);
+        const matchB = dimsB.find((dB) => getKey(dB) === keyA);
 
         if (matchB) {
           changes.push({
             changeType: "DIMENSION",
             actionType: "CHANGED",
-            category: "Dimension Modified",
-            description: `Dimension value or tolerance updated for ${baseA}.`,
-            oldValue: d,
+            category: "Parameter Modified",
+            description: `Value updated for ${keyA}`,
+            oldValue: dA,
             newValue: matchB,
-            boundingBox: JSON.stringify({ x: 220, y: 310, w: 90, h: 45 }), // Seed coordinates
-            manufacturingImpact: `Tolerance changed. Fits must be re-calibrated. Inspection frequency must match updated tolerance thresholds.`,
-            qualityImpact: `Perform micrometer verification. Verify Cpk index remains above critical control limit.`,
+            boundingBox: JSON.stringify({ x: 220, y: 310, w: 90, h: 45 }),
+            manufacturingImpact: `Parameter change detected. Machine tooling and process feeds must be re-calibrated.`,
+            qualityImpact: `Verify conformance to updated specification limit.`,
           });
         } else {
           changes.push({
             changeType: "DIMENSION",
             actionType: "REMOVED",
-            category: "Dimension Removed",
-            description: `Dimension callout removed from drawing: ${d}`,
-            oldValue: d,
+            category: "Parameter Removed",
+            description: `Parameter/callout removed: ${dA}`,
+            oldValue: dA,
             newValue: undefined,
             boundingBox: JSON.stringify({ x: 610, y: 250, w: 60, h: 60 }),
-            manufacturingImpact:
-              "Cycle time check. Verify feature is no longer critical for assembly matching.",
-            qualityImpact: "Inspection parameter removed from control plan.",
+            manufacturingImpact: "Verify feature removal does not affect mating component stackup.",
+            qualityImpact: "Remove parameter from CMM inspection routine.",
           });
         }
       }
     }
 
-    // Check for added dimensions
-    for (const d of dimsB) {
-      const baseB = d.split("±")[0].trim();
-      const matchA = dimsA.find((da) => da.split("±")[0].trim() === baseB);
-      if (!dimsA.includes(d) && !matchA) {
+    // Check for added dimensions / parameters in Rev B
+    for (const dB of dimsB) {
+      const keyB = getKey(dB);
+      const matchA = dimsA.find((dA) => getKey(dA) === keyB);
+
+      if (!dimsA.includes(dB) && !matchA) {
         changes.push({
           changeType: "DIMENSION",
           actionType: "ADDED",
-          category: "Dimension Added",
-          description: `New dimension callout added: ${d}`,
+          category: "Parameter Added",
+          description: `New parameter/callout added: ${dB}`,
           oldValue: undefined,
-          newValue: d,
+          newValue: dB,
           boundingBox: JSON.stringify({ x: 310, y: 440, w: 75, h: 40 }),
-          manufacturingImpact:
-            "New setup measurement required. Calibrate machine reference coordinates.",
-          qualityImpact: "Add dimension check to inspection checklist.",
+          manufacturingImpact: "New measurement callout required during machining operations.",
+          qualityImpact: "Add measurement check to active quality control plan.",
         });
       }
     }
 
-    // Compare Notes
-    for (const n of notesA) {
-      if (!notesB.includes(n)) {
+    // 2. Compare Notes / Specification Lines
+    for (const nA of notesA) {
+      if (!notesB.includes(nA)) {
         changes.push({
           changeType: "NOTE",
           actionType: "REMOVED",
-          category: "Note Removed",
-          description: `Drawing note removed: ${n}`,
-          oldValue: n,
+          category: "Drawing Note Removed",
+          description: `Drawing note or specification line removed: ${nA}`,
+          oldValue: nA,
           newValue: undefined,
           boundingBox: JSON.stringify({ x: 50, y: 700, w: 250, h: 60 }),
           manufacturingImpact:
-            "Ensure process adjustments are logged if deburring or coating notes were removed.",
-          qualityImpact: "Verify note removal conforms to design authority instruction.",
+            "Verify process adjustment if deburring or coating notes were changed.",
+          qualityImpact: "Confirm note deletion with design authority.",
         });
       }
     }
 
-    for (const n of notesB) {
-      if (!notesA.includes(n)) {
+    for (const nB of notesB) {
+      if (!notesA.includes(nB)) {
         changes.push({
           changeType: "NOTE",
           actionType: "ADDED",
-          category: "Note Added",
-          description: `New drawing note added: ${n}`,
+          category: "Drawing Note Added",
+          description: `New drawing note or specification line added: ${nB}`,
           oldValue: undefined,
-          newValue: n,
+          newValue: nB,
           boundingBox: JSON.stringify({ x: 50, y: 650, w: 250, h: 60 }),
-          manufacturingImpact: "Follow plating or deburring specification as stated in the note.",
-          qualityImpact: "Verify finish thickness or coupon testing requirement.",
+          manufacturingImpact: "Implement process requirement specified in the added note.",
+          qualityImpact: "Verify quality inspection coupon requirement.",
         });
       }
     }
 
-    // Compare Material
+    // 3. Compare Material Titleblock Field
     if (revA.material !== revB.material) {
       changes.push({
         changeType: "TITLE_BLOCK",
         actionType: "CHANGED",
         category: "Material Spec Changed",
-        description: `Material changed from ${revA.material} to ${revB.material}`,
+        description: `Material specification updated from ${revA.material} to ${revB.material}`,
         oldValue: revA.material || "Not specified",
         newValue: revB.material || "Not specified",
         boundingBox: JSON.stringify({ x: 450, y: 120, w: 120, h: 50 }),
-        manufacturingImpact: `Material change may impact cutting speed, tool wear, and heat-treat profiles. Calibrate feed rates.`,
-        qualityImpact: `Verify material certificate conforms to the new specification before machining.`,
+        manufacturingImpact: `Material change impacts heat-treat cycles and tool speeds.`,
+        qualityImpact: `Verify material test report (MTR) against new specification prior to release.`,
       });
     }
 
-    // Save detected changes
+    // Save all detected changes
     for (const c of changes) {
       await prisma.drawingDetectedChange.create({
         data: {
@@ -241,8 +290,8 @@ export async function runDrawingComparison(projectId: string, revAId: string, re
       });
     }
 
-    // Generate drawing comparison report summary
-    const summaryText = `Drawing Comparison report between ${revA.revisionLabel} and ${revB.revisionLabel} generated ${changes.length} change logs. Out of these, ${changes.filter((c) => c.changeType === "DIMENSION").length} dimensions were modified or added.`;
+    // Generate summary report
+    const summaryText = `Comparison between ${revA.revisionLabel} and ${revB.revisionLabel} identified ${changes.length} engineering change logs (${changes.filter((c) => c.changeType === "DIMENSION").length} parameters modified/added).`;
     const mfgImpactsText = changes
       .map((c) => c.manufacturingImpact)
       .filter(Boolean)
@@ -254,12 +303,12 @@ export async function runDrawingComparison(projectId: string, revAId: string, re
 
     await prisma.drawingReport.create({
       data: {
-        projectId: job.projectId,
-        title: `Revision Change Report - ${revA.revisionLabel} vs ${revB.revisionLabel}`,
+        projectId,
+        title: `Engineering Change Notice Report: ${revA.revisionLabel} vs ${revB.revisionLabel}`,
         summary: summaryText,
         changesJson: JSON.stringify(changes),
-        mfgImpact: mfgImpactsText || "Unable to determine.",
-        qualityImpact: qualityImpactsText || "Unable to determine.",
+        mfgImpact: mfgImpactsText || "No manufacturing process impact recorded.",
+        qualityImpact: qualityImpactsText || "No quality inspection plan impact recorded.",
       },
     });
 
@@ -271,15 +320,16 @@ export async function runDrawingComparison(projectId: string, revAId: string, re
         progress: 100,
       },
     });
-  } catch (error) {
-    console.error("Comparison process failed:", error);
+
+    return job;
+  } catch (err: any) {
     await prisma.drawingComparisonJob.update({
       where: { id: job.id },
       data: {
         status: "FAILED",
-        error: error instanceof Error ? error.message : "Comparison failed.",
+        error: err.message,
       },
     });
-    throw error;
+    throw err;
   }
 }

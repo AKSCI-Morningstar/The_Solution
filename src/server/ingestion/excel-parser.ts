@@ -6,8 +6,8 @@ export interface ParsedSpreadsheet {
 }
 
 /**
- * Parses binary spreadsheet buffer into clean CSV-compatible row structures.
- * Supports binary .xlsx, .xls, .csv, and .tsv formats safely.
+ * Parses binary spreadsheet or text buffer into clean CSV-compatible row structures.
+ * Auto-detects delimiters (, ; \t |) and extracts all columns and rows.
  */
 export async function parseBinarySpreadsheet(
   fileBuffer: Buffer,
@@ -15,8 +15,6 @@ export async function parseBinarySpreadsheet(
 ): Promise<ParsedSpreadsheet> {
   const content = fileBuffer.toString("utf-8");
 
-  // Handles text-based CSV/TSV format cleanly
-  const delimiter = fileName.endsWith(".tsv") ? "\t" : ",";
   const lines = content
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -26,16 +24,32 @@ export async function parseBinarySpreadsheet(
     return { sheetName: "Sheet1", columns: [], rows: [], totalRows: 0 };
   }
 
+  // Auto-detect delimiter if not obvious from extension
+  let delimiter = ",";
+  if (fileName.endsWith(".tsv")) {
+    delimiter = "\t";
+  } else {
+    const firstLine = lines[0];
+    if (firstLine.includes("\t")) delimiter = "\t";
+    else if (firstLine.includes(";")) delimiter = ";";
+    else if (firstLine.includes("|")) delimiter = "|";
+  }
+
   const columns = lines[0].split(delimiter).map((c) => c.replace(/^["']|["']$/g, "").trim());
   const rows: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(delimiter).map((v) => v.replace(/^["']|["']$/g, "").trim());
     const rowObj: Record<string, string> = {};
+    let hasValue = false;
     for (let j = 0; j < columns.length; j++) {
-      rowObj[columns[j]] = values[j] || "";
+      const val = values[j] || "";
+      rowObj[columns[j]] = val;
+      if (val) hasValue = true;
     }
-    rows.push(rowObj);
+    if (hasValue) {
+      rows.push(rowObj);
+    }
   }
 
   return {
