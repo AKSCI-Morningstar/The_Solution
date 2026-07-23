@@ -10,6 +10,7 @@ import {
   Database,
   Lock,
 } from "lucide-react";
+import { DemoLoginButton } from "@/components/DemoLoginButton";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -72,6 +73,12 @@ export default function Home() {
             </span>
           </div>
           <nav className="flex items-center gap-4">
+            <DemoLoginButton
+              variant="secondary"
+              className="border border-indigo-500/30 bg-indigo-500/10 text-xs text-indigo-300 hover:bg-indigo-500/20"
+            >
+              ⚡ Guest Demo Access
+            </DemoLoginButton>
             <Link href="/login" className="no-underline">
               <Button variant="ghost" className="text-zinc-400 transition-colors hover:text-white">
                 Sign In
@@ -115,13 +122,19 @@ export default function Home() {
 
         {/* Action Buttons */}
         <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <Link href="/dashboard" className="no-underline">
+          <DemoLoginButton
+            variant="primary"
+            className="flex items-center gap-2 border-0 bg-gradient-to-r from-indigo-500 to-purple-600 px-8 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-600 hover:to-purple-700"
+          >
+            ⚡ Try Live Demo (Guest) <ArrowRight className="h-4 w-4" />
+          </DemoLoginButton>
+          <Link href="/login" className="no-underline">
             <Button
-              variant="primary"
+              variant="secondary"
               size="lg"
-              className="flex items-center gap-2 border-0 bg-gradient-to-r from-indigo-500 to-purple-600 px-8 text-white shadow-lg shadow-indigo-500/20 hover:from-indigo-600 hover:to-purple-700"
+              className="border border-zinc-800 bg-zinc-900/30 text-zinc-300 hover:bg-zinc-800/50"
             >
-              Get Started <ArrowRight className="h-4 w-4" />
+              Sign In
             </Button>
           </Link>
           <a

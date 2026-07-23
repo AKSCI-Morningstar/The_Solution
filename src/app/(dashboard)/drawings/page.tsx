@@ -1,17 +1,11 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import {
-  RefreshCw,
-  FileText,
-  ChevronRight,
-  Layers,
-  Folder,
-  AlertTriangle,
-  LoaderIcon,
-} from "lucide-react";
+import { RefreshCw, FileText, ChevronRight, Layers, Folder, AlertTriangle } from "lucide-react";
 import { PageContainer, Stack } from "@/components/layout";
 import { Button, Badge, Card, CardContent, Divider, Input } from "@/components/ui";
 

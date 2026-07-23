@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/server/db";
 
 export interface CreateDecisionInput {
@@ -83,7 +84,7 @@ export async function addDecisionMilestone(input: DecisionMilestoneInput) {
       milestoneType: input.milestoneType,
       status: input.status,
       actualOutcome: input.actualOutcome,
-      metrics: input.metrics || {},
+      metrics: (input.metrics as any) || {},
       completedAt: input.status === "COMPLETE" ? new Date() : null,
     },
   });
