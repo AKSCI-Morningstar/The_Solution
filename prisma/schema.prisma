@@ -57,6 +57,14 @@ model User {
   uploadedRevisions           DrawingRevision[]
   proposedDecisions           EngineeringDecision[]        @relation("DecisionProposer")
   decisionApprovals           DecisionApproval[]
+  submittedAssessments        DrawingAssessment[]          @relation("AssessmentSubmittedBy")
+  approvedAssessments         DrawingAssessment[]          @relation("AssessmentApprovedBy")
+  lastEditedAssessments       DrawingAssessment[]          @relation("AssessmentLastEditedBy")
+  assessmentReviews           AssessmentReview[]
+  assessmentEdits             AssessmentEditHistory[]
+  assessmentComments          AssessmentComment[]
+  recordSnapshots             RecordSnapshot[]
+  dismissedAnomalies          AnomalyAlert[]
 
   @@index([email])
   @@index([status])
@@ -107,6 +115,9 @@ model Organization {
   decisions                Decision[]
   programs                 Program[]
   drawingDesignPatterns    DrawingDesignPattern[]
+  drawingAssessments       DrawingAssessment[]
+  dataQualityMetrics       DataQualityMetrics[]
+  anomalyAlerts            AnomalyAlert[]
   timestamps               Timestamp[]
   supplierContacts         SupplierContact[]
   supplierCertifications   SupplierCertification[]
@@ -1752,6 +1763,7 @@ model DrawingProject {
   drawings      Drawing[]
   comparisons   DrawingComparisonJob[]
   reports       DrawingReport[]
+  assessments   DrawingAssessment[]
 
   @@index([ownerId])
 }
@@ -2023,4 +2035,158 @@ model DrawingDesignPattern {
 
   @@index([organizationId])
 }
+
+// ---------------------------------------------------------------------------
+// Assessment Collaboration & Governance (Feature 2)
+// ---------------------------------------------------------------------------
+
+model DrawingAssessment {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  projectId           String?
+  title               String
+  description         String
+  status              String   @default("draft") // draft | submitted | approved | superseded
+  severity            String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  version             Int      @default(1)
+  parentAssessmentId  String?
+  submittedAt         DateTime?
+  submittedById       String?
+  approvedAt          DateTime?
+  approvedById        String?
+  approvalReason      String?
+  lastEditedById      String?
+  lastEditedAt        DateTime?
+  editReason          String?
+  evidenceSummary     Json?
+  consequencesJson    Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project             DrawingProject?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  submittedBy         User?                   @relation("AssessmentSubmittedBy", fields: [submittedById], references: [id])
+  approvedBy          User?                   @relation("AssessmentApprovedBy", fields: [approvedById], references: [id])
+  lastEditedBy        User?                   @relation("AssessmentLastEditedBy", fields: [lastEditedById], references: [id])
+  parentAssessment    DrawingAssessment?      @relation("AssessmentRevisions", fields: [parentAssessmentId], references: [id])
+  revisions           DrawingAssessment[]     @relation("AssessmentRevisions")
+  reviews             AssessmentReview[]
+  editHistory         AssessmentEditHistory[]
+  comments            AssessmentComment[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([status])
+  @@index([parentAssessmentId])
+}
+
+model AssessmentReview {
+  id              String            @id @default(cuid())
+  assessmentId    String
+  reviewerId      String
+  status          String            @default("pending") // pending | approved | rejected
+  feedback        String?
+  resolutionDate  DateTime?
+  createdAt       DateTime          @default(now())
+
+  assessment      DrawingAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  reviewer        User              @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([reviewerId])
+  @@index([status])
+}
+
+model AssessmentEditHistory {
+  id              String            @id @default(cuid())
+  assessmentId    String
+  editedById      String
+  fieldName       String
+  oldValue        String?
+  newValue        String?
+  changeReason    String?
+  statusBefore    String?
+  statusAfter     String?
+  editedAt        DateTime          @default(now())
+
+  assessment      DrawingAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  editedBy        User              @relation(fields: [editedById], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([editedById])
+}
+
+model AssessmentComment {
+  id              String            @id @default(cuid())
+  assessmentId    String
+  userId          String
+  text            String
+  isResolved      Boolean           @default(false)
+  resolvedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  assessment      DrawingAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Executive Audit & Analytics Dashboard (Feature 3)
+// ---------------------------------------------------------------------------
+
+model RecordSnapshot {
+  id                String   @id @default(cuid())
+  recordId          String
+  recordType        String   // decision | failure | supplier_outcome | part | assessment
+  snapshotDate      DateTime @default(now())
+  snapshotData      Json
+  changedById       String?
+  changeDescription String?
+
+  changedBy         User?    @relation(fields: [changedById], references: [id])
+
+  @@index([recordId])
+  @@index([recordType])
+  @@index([snapshotDate])
+}
+
+model DataQualityMetrics {
+  id                   String   @id @default(cuid())
+  workspaceId          String
+  computedAt           DateTime @default(now())
+  totalRecords         Int
+  completeRecordsPct   Float
+  avgConfidence        Float
+  recordsByType        Json
+  assessmentsByStatus  Json
+  dataFreshnessDays    Int
+
+  organization         Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([computedAt])
+}
+
+model AnomalyAlert {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  recordId       String?
+  alertType      String    // sparse_data | conflicting_data | supplier_degradation | stale_data
+  severity       String    @default("warning") // warning | critical
+  description    String
+  isDismissed    Boolean   @default(false)
+  dismissedAt    DateTime?
+  dismissedById  String?
+  detectedAt     DateTime  @default(now())
+
+  organization   Organization @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dismissedBy    User?        @relation(fields: [dismissedById], references: [id])
+
+  @@index([workspaceId])
+  @@index([alertType])
+  @@index([isDismissed])
+}
+
 
