@@ -8,8 +8,6 @@ import { imageParser } from "./image-parser";
 import { genericTextFallbackParser } from "./generic-text-fallback-parser";
 import type { FileDescriptor, ParseContext, ParsedDocument, Parser } from "./parser.types";
 
-const TEXT_REPRESENTABLE_EXTENSIONS = new Set(["txt", "md", "markdown", "csv"]);
-
 export interface ParserHealth {
   parserName: string;
   parserVersion: string;
@@ -82,7 +80,14 @@ class ParserRegistry {
   ): Promise<{ document: ParsedDocument; parserName: string; parserVersion: string }> {
     const parser = this.resolve(file);
     if (!parser) {
-      throw new Error(`No parser registered for extension "${file.extension}"`);
+      // Fallback to generic text/binary parser for any file type (CAD, STEP, DXF, CSV, XLSX, etc.)
+      const document = await genericTextFallbackParser.parse(buffer, context);
+      this.recordSuccess(genericTextFallbackParser.name);
+      return {
+        document,
+        parserName: genericTextFallbackParser.name,
+        parserVersion: genericTextFallbackParser.version,
+      };
     }
 
     try {
@@ -92,19 +97,19 @@ class ParserRegistry {
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown parser error";
       this.recordFailure(parser.name, message);
-      logger.warn("Parser failed", { parser: parser.name, file: file.extension, error: message });
+      logger.warn("Parser failed, falling back to generic parser:", {
+        parser: parser.name,
+        file: file.extension,
+        error: message,
+      });
 
-      if (TEXT_REPRESENTABLE_EXTENSIONS.has(file.extension.toLowerCase())) {
-        const document = await genericTextFallbackParser.parse(buffer, context);
-        this.recordSuccess(genericTextFallbackParser.name);
-        return {
-          document,
-          parserName: genericTextFallbackParser.name,
-          parserVersion: genericTextFallbackParser.version,
-        };
-      }
-
-      throw error;
+      const document = await genericTextFallbackParser.parse(buffer, context);
+      this.recordSuccess(genericTextFallbackParser.name);
+      return {
+        document,
+        parserName: genericTextFallbackParser.name,
+        parserVersion: genericTextFallbackParser.version,
+      };
     }
   }
 }

@@ -371,12 +371,12 @@ export default function DrawingsDashboardPage() {
 
                       <div className="flex flex-col gap-1 text-left">
                         <label className="text-xs font-semibold text-zinc-400">
-                          Upload Revision A (PDF)
+                          Upload Revision A (PDF, CAD STEP/DXF, CSV, XLSX, Images, Any format)
                         </label>
                         <input
                           required
                           type="file"
-                          accept=".pdf"
+                          accept="*/*"
                           onChange={(e) => setFileA(e.target.files?.[0] || null)}
                           className="mt-1 text-xs text-zinc-400"
                         />
@@ -384,12 +384,12 @@ export default function DrawingsDashboardPage() {
 
                       <div className="flex flex-col gap-1 text-left">
                         <label className="text-xs font-semibold text-zinc-400">
-                          Upload Revision B (PDF)
+                          Upload Revision B (PDF, CAD STEP/DXF, CSV, XLSX, Images, Any format)
                         </label>
                         <input
                           required
                           type="file"
-                          accept=".pdf"
+                          accept="*/*"
                           onChange={(e) => setFileB(e.target.files?.[0] || null)}
                           className="mt-1 text-xs text-zinc-400"
                         />

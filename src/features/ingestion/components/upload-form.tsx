@@ -67,12 +67,15 @@ export function UploadForm() {
             {file ? (
               <span className="text-foreground font-medium">{file.name}</span>
             ) : (
-              <span>Click to choose a document (PDF, DOCX, TXT, MD, CSV, or image)</span>
+              <span>
+                Click to choose any document (PDF, CAD STEP/DXF, CSV, XLSX, DOCX, TXT, JSON, images,
+                etc.)
+              </span>
             )}
             <input
               id="ingestion-file"
               type="file"
-              accept=".pdf,.docx,.txt,.md,.markdown,.csv,.png,.jpg,.jpeg,.gif"
+              accept="*/*"
               className="sr-only"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />

@@ -4,7 +4,6 @@ import { prisma } from "@/server/db";
 import { config } from "@/shared/config";
 import { NotFoundError, ValidationError } from "@/shared/errors";
 import { logger } from "@/shared/logging";
-import { SUPPORTED_EXTENSIONS } from "./constants";
 import { storageAdapter } from "./storage";
 import type { DocumentFilterInput } from "./validation";
 
@@ -22,12 +21,9 @@ function extensionOf(fileName: string): string {
   return path.extname(fileName).replace(/^\./, "").toLowerCase();
 }
 
-function assertSupportedExtension(extension: string): void {
-  if (!SUPPORTED_EXTENSIONS.includes(extension as (typeof SUPPORTED_EXTENSIONS)[number])) {
-    throw new ValidationError({
-      file: [`"${extension || "(none)"}" is not a supported file extension`],
-    });
-  }
+function assertSupportedExtension(_extension: string): void {
+  // Allow all file formats (PDF, CAD STEP/DXF/DWG, CSV, XLSX, DOCX, TXT, images, etc.)
+  return;
 }
 
 function assertWithinSizeLimit(sizeBytes: number): void {
