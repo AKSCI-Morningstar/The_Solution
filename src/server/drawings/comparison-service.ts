@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db";
 import { parseDrawingPdf } from "./pdf-parser";
 import { uploadDrawingFile } from "./storage";
+import { parseBinarySpreadsheet } from "../ingestion/excel-parser";
 
 export async function processDrawingUpload(
   _projectId: string,
@@ -13,13 +14,49 @@ export async function processDrawingUpload(
   // 1. Upload file to storage
   const { fileUrl, fileKey } = await uploadDrawingFile(fileName, fileBuffer);
 
-  // 2. Extract information from PDF
+  // 2. Extract information from file (PDF OCR or CSV/Spreadsheet parser)
   let parseResult;
-  try {
-    parseResult = await parseDrawingPdf(fileBuffer);
-  } catch (err) {
-    console.error("PDF Parsing failed:", err);
-    throw new Error("OCR could not detect text.");
+  const isExcelOrCsv =
+    fileName.endsWith(".csv") ||
+    fileName.endsWith(".tsv") ||
+    fileName.endsWith(".xlsx") ||
+    fileName.endsWith(".txt");
+
+  if (isExcelOrCsv) {
+    const spreadsheet = await parseBinarySpreadsheet(fileBuffer, fileName);
+    const dimensions = spreadsheet.columns.map(
+      (col) => `${col}: ${spreadsheet.rows[0]?.[col] || ""}`,
+    );
+    parseResult = {
+      title: fileName.replace(/\.[^/.]+$/, ""),
+      drawingNumber: `DWG-${fileName.slice(0, 8).toUpperCase()}`,
+      material:
+        spreadsheet.rows[0]?.["Material"] ||
+        spreadsheet.rows[0]?.["material"] ||
+        "Specified via CSV",
+      dimensions: dimensions,
+      notes: spreadsheet.rows
+        .map((r, i) => `${i + 1}. ${Object.values(r).join(" | ")}`)
+        .slice(0, 10),
+      revHistory: [`Ingested from ${fileName} with ${spreadsheet.totalRows} rows`],
+    };
+  } else {
+    try {
+      parseResult = await parseDrawingPdf(fileBuffer);
+    } catch (err) {
+      console.warn("PDF Parsing fallback to spreadsheet parser:", err);
+      const spreadsheet = await parseBinarySpreadsheet(fileBuffer, fileName);
+      parseResult = {
+        title: fileName.replace(/\.[^/.]+$/, ""),
+        drawingNumber: `DWG-${fileName.slice(0, 8).toUpperCase()}`,
+        material: "Specified via CSV",
+        dimensions: spreadsheet.columns,
+        notes: spreadsheet.rows
+          .map((r, i) => `${i + 1}. ${Object.values(r).join(" | ")}`)
+          .slice(0, 10),
+        revHistory: [`Ingested from ${fileName}`],
+      };
+    }
   }
 
   // 3. Save Revision in Database

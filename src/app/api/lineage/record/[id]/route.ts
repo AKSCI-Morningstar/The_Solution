@@ -3,7 +3,7 @@ import { validateSession } from "@/server/auth/session-service";
 import { getActiveOrganizationId } from "@/server/organizations/organization-context";
 import { getRecordLineage } from "@/server/lineage/lineage-service";
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await validateSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
